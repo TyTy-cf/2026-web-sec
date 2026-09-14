@@ -1,0 +1,21 @@
+{% extends 'front/base.html.twig' %}
+
+{% block title %}Edit {{ topic.title }}{% endblock %}
+
+{% block body %}
+    <nav aria-label="breadcrumb" class="mt-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ path('app_home') }}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a></li>
+            <li class="breadcrumb-item active">Edit</li>
+        </ol>
+    </nav>
+
+    <h1 class="mb-4">Edit topic</h1>
+
+    {{ form_start(topicForm) }}
+        {{ form_row(topicForm.title) }}
+        {{ form_row(topicForm.content) }}
+        {{ form_widget(topicForm.submit) }}
+    {{ form_end(topicForm) }}
+{% endblock %}

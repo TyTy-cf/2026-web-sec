@@ -40,6 +40,7 @@ class Topic
      * @var Collection<int, Comment>
      */
     #[ORM\OneToMany(targetEntity: Comment::class, mappedBy: 'topic')]
+    #[ORM\OrderBy(['createdAt' => 'ASC'])]
     private Collection $comments;
 
     #[ORM\Column(length: 255, nullable: true)]

@@ -1,0 +1,49 @@
+{% extends 'front/base.html.twig' %}
+
+{% block title %}{{ topic.title }}{% endblock %}
+
+{% block body %}
+    <nav aria-label="breadcrumb" class="mt-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ path('app_home') }}">Home</a></li>
+            <li class="breadcrumb-item active">{{ topic.title }}</li>
+        </ol>
+    </nav>
+
+    <article class="mb-4">
+        <div class="d-flex justify-content-between align-items-start">
+            <h1>{{ topic.title }}</h1>
+            {% if app.user and app.user == topic.author %}
+                <a href="{{ path('app_topic_edit', { id: topic.id }) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+            {% endif %}
+        </div>
+        <p class="text-muted">
+            {{ topic.category.name }} &middot; posted by {{ topic.author.nickname }} on {{ topic.createdAt|date('d/m/Y H:i') }}
+        </p>
+        <p>{{ topic.content }}</p>
+    </article>
+
+    {% for flashMessage in app.flashes('success') %}
+        <div class="alert alert-success">{{ flashMessage }}</div>
+    {% endfor %}
+
+    <h2>Comments ({{ comments|length }})</h2>
+
+    <ul class="list-group mb-4">
+        {% for comment in comments %}
+            <li class="list-group-item">
+                <strong>{{ comment.author.nickname }}</strong>
+                <span class="text-muted small">&mdash; {{ comment.createdAt|date('d/m/Y H:i') }}</span>
+                <div>{{ comment.content|raw }}</div>
+            </li>
+        {% else %}
+            <li class="list-group-item">Be the first one to comment.</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Add a comment</h3>
+    {{ form_start(commentForm) }}
+        {{ form_row(commentForm.content) }}
+        {{ form_widget(commentForm.submit) }}
+    {{ form_end(commentForm) }}
+{% endblock %}
