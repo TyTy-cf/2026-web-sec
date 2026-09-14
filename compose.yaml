@@ -39,7 +39,7 @@ services:
     image: mariadb:10.11.11
     environment:
       MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: exam
+      MARIADB_DATABASE: fakeddit
     ports:
       - 3306:3306
     volumes:

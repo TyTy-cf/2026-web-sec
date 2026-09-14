@@ -1,8 +1,8 @@
 DOCKER_COMPOSE ?= docker compose
 DOCKER_USER ?= "$(shell id -u):$(shell id -g)"
 ENV ?= "dev"
-PREFIX ?= "exam"
-DB_NAME="exam"
+PREFIX ?= "fakeddit"
+DB_NAME="fakeddit"
 
 init:
 	@cp .env .env.local
@@ -16,26 +16,26 @@ init:
 
 db-reset:
 	@echo "DELETE DB..."
-	@docker compose exec -T mariadb mysql -uroot -proot -e "DROP database IF EXISTS exam;"
+	@docker compose exec -T mariadb mysql -uroot -proot -e "DROP database IF EXISTS fakeddit;"
 
 	@echo "CREATE DB..."
 	@docker compose exec -T php php bin/console doctrine:database:create
 	@docker compose exec -T php php bin/console d:m:m -n
 
 	@echo "Importing initial database structure and data..."
-	@docker compose exec -T mariadb mysql -uroot -proot $(DB_NAME) < ./docker/exam.sql
+	@docker compose exec -T mariadb mysql -uroot -proot $(DB_NAME) < ./docker/fakeddit.sql
 	@echo "Database import completed."
 
 db:
 	@echo "DELETE DB..."
-	@docker compose exec -T mariadb mysql -uroot -proot -e "DROP database IF EXISTS exam;"
+	@docker compose exec -T mariadb mysql -uroot -proot -e "DROP database IF EXISTS fakeddit;"
 
 	@echo "CREATE DB..."
 	@docker compose exec -T php php bin/console doctrine:database:create
 	@docker compose exec -T php php bin/console d:m:m -n
 
 	@echo "Importing initial database structure and data..."
-	@docker compose exec -T mariadb mysql -uroot -proot $(DB_NAME) < ./docker/exam.sql
+	@docker compose exec -T mariadb mysql -uroot -proot $(DB_NAME) < ./docker/fakeddit.sql
 	@echo "Database import completed."
 
 up:

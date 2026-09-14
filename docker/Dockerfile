@@ -38,8 +38,8 @@ COPY docker/xdebug.ini /usr/local/etc/php/conf.d/
 RUN curl -sS https://get.symfony.com/cli/installer | bash && \
     mv /root/.symfony*/bin/symfony /usr/local/bin/symfony
 
-ARG USER_ID=1001
-ARG GROUP_ID=1001
+ARG USER_ID=1000
+ARG GROUP_ID=1000
 
 USER root
 
@@ -55,8 +55,8 @@ USER ${USER_ID}:${GROUP_ID}
 ######
 FROM node:22 AS node-dev
 
-ARG USER_ID=1001
-ARG GROUP_ID=1001
+ARG USER_ID=1000
+ARG GROUP_ID=1000
 
 USER root
 
