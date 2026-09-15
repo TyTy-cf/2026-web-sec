@@ -90,3 +90,12 @@ The payload never touches the server: the `ref` value lives only in the URL frag
 The files impacted are `CategoryController.php`, `TopicRepository.php` (`findByCategory` method), `templates/front/category/show.html.twig`, `templates/front/home/index.html.twig` (category link) and `assets/scripts/app.ts` (the vulnerable line)
 
 
+### 2.5 Content Security Policy
+
+
+Unlike the previous features, this one is a missing hardening measure rather than a bad practice: no CSP header is configured anywhere in the app.
+
+- [x] No `Content-Security-Policy` header on purpose, and no code was written for this exercise
+
+Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.1, 2.3 and 2.4 without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
+

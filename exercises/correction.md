@@ -123,3 +123,45 @@ Il suffit d'ajouter les guillemets autour de la valeur ; l'autoescape Twig fait 
 On construit le DOM avec `createElement`/`textContent`/`append` au lieu de `innerHTML` : `ref` est alors toujours traité comme du texte, jamais parsé comme du HTML, quel que soit son contenu.
 
 Point à vérifier avec le stagiaire : le correctif est **uniquement côté client** (rebuild du JS/TS), rien à changer côté Symfony/Twig — c'est la caractéristique du DOM-based XSS, la faille n'existe jamais côté serveur.
+
+---
+
+## Exercice 5 — Content Security Policy
+
+**Code à recevoir** : pas de payload. Le livrable est une politique CSP fonctionnelle (preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 1, 3 et 4 sont neutralisés sans avoir touché au code vulnérable.
+
+**Point de départ attendu** : le stagiaire doit remarquer que `security.yaml` ne gère que l'authentification/autorisation (firewalls, providers, access_control), et chercher ailleurs. Deux réponses valables, au choix :
+
+**Option A — NelmioSecurityBundle** (la plus idiomatique côté Symfony) :
+```
+composer require nelmio/security-bundle
+```
+```yaml
+# config/packages/nelmio_security.yaml
+nelmio_security:
+    csp:
+        enforce:
+            default-src: ["'self'"]
+            script-src: ["'self'"]
+            style-src: ["'self'"]
+            img-src: ["'self'", 'data:']
+```
+
+**Option B — en-tête posé par Caddy** (aucun code applicatif) :
+```
+# Caddyfile
+https://localhost:8443 {
+    tls internal
+    root * /var/www/html/public
+    header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+    file_server
+    php_fastcgi php:9000
+}
+```
+
+Une troisième réponse (un `EventSubscriber` sur `kernel.response` qui ajoute l'en-tête à la main) est acceptable mais plus lourde qu'utile ici — à mentionner si le stagiaire part dans cette direction, sans le pénaliser.
+
+**Vérification à faire avec le stagiaire** :
+- Sans `'unsafe-inline'` dans `script-src`, les balises `<script>` injectées (exercice 1) et les gestionnaires d'évènements inline (`onerror=`, `onfocus=`, exercices 3 et 4) sont bloqués par le navigateur, qui affiche une erreur *Refused to execute inline script/event handler because it violates the following Content Security Policy directive* dans la console — **sans que le code vulnérable n'ait changé**. C'est le point pédagogique central : la CSP est une mesure de défense en profondeur, pas un correctif
+- **Régression attendue** : l'input `#share-link` de `templates/front/category/show.html.twig` a un `onclick="this.select()"` inline, qui est lui aussi bloqué par une politique stricte. Le stagiaire doit le remarquer et le corriger en déplaçant la logique dans `assets/scripts/app.ts` (`document.getElementById('share-link')?.addEventListener('click', ...)`) plutôt qu'en ajoutant `'unsafe-inline'` (ce qui annulerait toute la protection obtenue à l'étape précédente)
+- Une politique qui autorise `'unsafe-inline'` "pour que ça marche plus simplement" doit être considérée comme un échec de l'exercice : ça ne bloque plus rien des exercices précédents

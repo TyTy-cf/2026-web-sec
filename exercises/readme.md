@@ -8,6 +8,7 @@
     - mot de passe : `123`
       (tous les utilisateurs préremplis partagent ce même mot de passe)
 
+- Il est recommandé de faire des branches pour les exercices, car  certains exercices nécessitent d'avoir un code vulnérable
 
 # Exercice 1 — Cross-Site Scripting (XSS)
 
@@ -170,3 +171,41 @@
 
 - Mettez en place le correctif pour éviter que cela ne se reproduise
 - Ce correctif peut-il être fait côté serveur (Symfony/Twig) ? Pourquoi ?
+
+
+# Exercice 5 — Content Security Policy (CSP)
+
+
+## Pour commencer
+
+
+- Aucune CSP n'est configurée sur l'application pour l'instant
+- Gardez sous la main les charges utiles des exercices 1, 3 et 4 : vous allez les rejouer plus tard dans cet exercice
+- Vous n'avez pas besoin d'avoir corrigé les exercices précédents pour faire celui-ci
+
+
+## Mission
+
+
+1. **Comprendre l'objectif.** Qu'est-ce qu'une Content Security Policy, et en quoi peut-elle limiter l'impact d'une faille XSS, même sans corriger le bug qui permet l'injection ?
+2. **Trouver où la configurer.** On pourrait penser que ça se passe dans `security.yaml`, vu son nom... regardez ce que ce fichier gère réellement dans une application Symfony. Cherchez comment on ajoute un en-tête `Content-Security-Policy` sur les réponses HTTP de cette stack (Symfony + Caddy). Il existe plusieurs façons de faire, à vous de choisir celle qui vous convient
+3. **Mettre en place une politique.** Configurez une politique plutôt stricte (par exemple en n'autorisant les scripts et styles qu'en provenance du même site). Vérifiez, dans les outils de développement du navigateur (onglet réseau), que l'en-tête est bien présent sur les réponses
+4. **Rejouer les anciennes charges utiles.** Reprenez les payloads des exercices 1 (commentaire), 3 (recherche) et 4 (partage de catégorie), sans corriger le code vulnérable sous-jacent. Que se passe-t-il maintenant ? Regardez la console du navigateur : un message apparaît-il ?
+5. **Vérifier les dégâts collatéraux.** Une politique stricte peut casser des fonctionnalités légitimes du site qui reposaient sur du JavaScript inline. Explorez le site à la recherche d'une fonctionnalité qui ne marche plus. Trouvez pourquoi, et corrigez-la sans réintroduire de faille
+6. **Prendre du recul.** La CSP a-t-elle corrigé une seule des failles des exercices précédents ? Si un attaquant trouve un moyen de contourner votre politique (par exemple parce qu'elle autorise une source qu'il contrôle), que se passe-t-il ?
+
+
+## Vous devez avoir fait
+
+
+- Expliqué pourquoi `security.yaml` n'est pas le bon endroit pour ça, et où vous avez effectivement placé la configuration
+- Mis en place une CSP dont vous pouvez prouver la présence (en-tête visible dans les réponses HTTP)
+- Constaté que les charges utiles des exercices 1, 3 et 4 sont neutralisées par votre politique, sans avoir touché au code vulnérable
+- Trouvé et corrigé une fonctionnalité légitime cassée par votre politique
+
+
+## Correctif
+
+
+- Il n'y a pas de correctif à proprement parler ici, la CSP *est* le livrable de cet exercice
+- La CSP remplace-t-elle les correctifs des exercices précédents, ou les complète-t-elle ? Justifiez
