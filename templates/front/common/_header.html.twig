@@ -14,7 +14,7 @@
                 <button class="btn btn-outline-secondary" type="submit">{{ 'common.search'|trans }}</button>
             </div>
         </form>
-        <div class="navbar-nav">
+        <div class="navbar-nav me-2">
             {% if app.user %}
                 {{ 'common.logged_in_as'|trans }} <span class="text-muted mx-2">{{ app.user.nickname }}</span>
                 <a href="{{ path('app_logout') }}">

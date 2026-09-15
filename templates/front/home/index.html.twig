@@ -6,7 +6,7 @@
     <h1 class="my-4">{{ 'home.latest_topics'|trans }}</h1>
 
     {% for topic in topics %}
-        <div class="card mb-3 col-6 mx-auto">
+        <div class="card mb-3 col-xl-6 col-md-8 col-12 mx-auto">
             <div class="card-body">
                 <h5 class="card-title">
                     <a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a>

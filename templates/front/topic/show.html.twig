@@ -31,10 +31,15 @@
 
     <ul class="list-group mb-4">
         {% for comment in comments %}
-            <li class="list-group-item">
-                <strong>{{ comment.author.nickname }}</strong>
-                <span class="text-muted small">&mdash; {{ comment.createdAt|date('d/m/Y H:i') }}</span>
-                <div>{{ comment.content|raw }}</div>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+                <div>
+                    <strong>{{ comment.author.nickname }}</strong>
+                    <span class="text-muted small">&mdash; {{ comment.createdAt|date('d/m/Y H:i') }}</span>
+                    <div>{{ comment.content|raw }}</div>
+                </div>
+                {% if app.user and app.user == comment.author %}
+                    <a href="{{ path('app_comment_delete', { id: comment.id }) }}" class="btn btn-sm btn-outline-danger">{{ 'common.delete'|trans }}</a>
+                {% endif %}
             </li>
         {% else %}
             <li class="list-group-item">{{ 'topic.no_comments'|trans }}</li>

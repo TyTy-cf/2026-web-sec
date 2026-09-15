@@ -1,6 +1,7 @@
 common:
     home: Accueil
     edit: Modifier
+    delete: Supprimer
     login: Connexion
     logout: Déconnexion
     logged_in_as: Connecté en tant que

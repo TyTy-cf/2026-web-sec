@@ -99,3 +99,17 @@ Unlike the previous features, this one is a missing hardening measure rather tha
 
 Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.1, 2.3 and 2.4 without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
 
+
+## 3. Reserved for later (not yet an exercise)
+
+
+These exist in the app for live demos during class, but have no entry in `exercises/readme.md` or `exercises/correction.md` yet — don't write one unless asked.
+
+
+### 3.1 Comment delete route (CSRF demo)
+
+
+`CommentController::delete` — `GET /commentaires/{id}/supprimer` (`app_comment_delete`). Deletes a comment with **no login check and no ownership check at all**, and is deliberately a `GET` route (no CSRF token involved) so it can be triggered by a bare link/image tag from any page, while the trainer is logged in, to demonstrate CSRF live. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button).
+
+Planned follow-up (not implemented, not scheduled yet): switch to `POST` + Symfony CSRF token to fix the CSRF issue, and add an ownership/login check (broken access control) as a separate concern for trainees to implement themselves.
+

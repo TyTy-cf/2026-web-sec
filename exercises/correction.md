@@ -165,3 +165,66 @@ Une troisième réponse (un `EventSubscriber` sur `kernel.response` qui ajoute l
 - Sans `'unsafe-inline'` dans `script-src`, les balises `<script>` injectées (exercice 1) et les gestionnaires d'évènements inline (`onerror=`, `onfocus=`, exercices 3 et 4) sont bloqués par le navigateur, qui affiche une erreur *Refused to execute inline script/event handler because it violates the following Content Security Policy directive* dans la console — **sans que le code vulnérable n'ait changé**. C'est le point pédagogique central : la CSP est une mesure de défense en profondeur, pas un correctif
 - **Régression attendue** : l'input `#share-link` de `templates/front/category/show.html.twig` a un `onclick="this.select()"` inline, qui est lui aussi bloqué par une politique stricte. Le stagiaire doit le remarquer et le corriger en déplaçant la logique dans `assets/scripts/app.ts` (`document.getElementById('share-link')?.addEventListener('click', ...)`) plutôt qu'en ajoutant `'unsafe-inline'` (ce qui annulerait toute la protection obtenue à l'étape précédente)
 - Une politique qui autorise `'unsafe-inline'` "pour que ça marche plus simplement" doit être considérée comme un échec de l'exercice : ça ne bloque plus rien des exercices précédents
+
+---
+
+## Démo CSRF (pas encore un exercice) — suppression de commentaire
+
+Pas de payload à recevoir ici, c'est une démo faite en cours. Ci-dessous le correctif **CSRF uniquement** (le contrôle d'accès — vérifier que l'utilisateur est bien l'auteur — reste volontairement absent, ce sera un exercice séparé pour les stagiaires).
+
+**Fix** — `src/Controller/CommentController.php`, méthode `delete()` : passer la route en `POST` et vérifier un jeton CSRF.
+```php
+<?php
+
+namespace App\Controller;
+
+use App\Entity\Comment;
+use App\Repository\CommentRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+final class CommentController extends AbstractController
+{
+
+    #[Route('/commentaires/{id}/supprimer', name: 'app_comment_delete', methods: ['POST'])]
+    public function delete(
+        string                 $id,
+        Request                $request,
+        EntityManagerInterface $entityManager,
+        CommentRepository      $commentRepository
+    ): Response
+    {
+        if (null === $comment = $commentRepository->findOneBy(['id' => $id])) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('delete-comment-' . $comment->getId(), $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $topic = $comment->getTopic();
+
+        $entityManager->remove($comment);
+        $entityManager->flush();
+
+        return $this->redirectToRoute('app_topic_show', ['id' => $topic->getId()]);
+    }
+
+}
+```
+
+**Fix** — `templates/front/topic/show.html.twig` : le lien `<a href>` devient un formulaire `POST` avec un jeton caché (un lien GET ne peut pas porter de jeton CSRF).
+```diff
+                 {% if app.user and app.user == comment.author %}
+-                    <a href="{{ path('app_comment_delete', { id: comment.id }) }}" class="btn btn-sm btn-outline-danger">{{ 'common.delete'|trans }}</a>
++                    <form method="post" action="{{ path('app_comment_delete', { id: comment.id }) }}" class="d-inline">
++                        <input type="hidden" name="_token" value="{{ csrf_token('delete-comment-' ~ comment.id) }}">
++                        <button type="submit" class="btn btn-sm btn-outline-danger">{{ 'common.delete'|trans }}</button>
++                    </form>
+                 {% endif %}
+```
+
+Point à faire ressortir : le token est lié à une action *et* à une ressource précise (`'delete-comment-' . $id`), pas juste à la session globale — ça empêche de réutiliser le token d'un formulaire pour en falsifier un autre. Le contrôle d'accès (vérifier `comment.author === user`) reste à ajouter séparément : ce correctif rend l'action impossible à déclencher *à l'insu* de la victime, mais un utilisateur malveillant qui construit lui-même la requête peut toujours supprimer le commentaire d'un autre s'il devine/observe l'ID.
