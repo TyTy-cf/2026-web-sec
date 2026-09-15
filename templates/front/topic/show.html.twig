@@ -18,7 +18,7 @@
             {% endif %}
         </div>
         <p class="text-muted">
-            {{ topic.category.name }} &middot; {{ 'common.posted_by'|trans({'%author%': topic.author.nickname, '%date%': topic.createdAt|date('d/m/Y H:i')}) }}
+            <a href="{{ path('app_category_show', { id: topic.category.id }) }}">{{ topic.category.name }}</a> &middot; {{ 'common.posted_by'|trans({'%author%': topic.author.nickname, '%date%': topic.createdAt|date('d/m/Y H:i')}) }}
         </p>
         <p>{{ topic.content }}</p>
     </article>
