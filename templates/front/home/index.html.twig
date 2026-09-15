@@ -20,7 +20,7 @@
                 <p class="card-text">
                     {{ topic.content|slice(0, 200) }}{% if topic.content|length > 200 %}&hellip;{% endif %}
                 </p>
-                <a href="{{ path('app_topic_show', { id: topic.id }) }}" class="btn btn-sm btn-outline-primary">{{ 'common.view_topic'|trans }}</a>
+                <a href="{{ path('app_topic_show', { id: topic.id }) }}" class="btn btn-sm btn-outline-success">{{ 'common.view_topic'|trans }}</a>
             </div>
         </div>
     {% else %}

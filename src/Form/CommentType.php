@@ -22,7 +22,7 @@ class CommentType extends AbstractType
     {
         $builder
             ->add('content', TextareaType::class, [
-                'label' => 'comment.content_label',
+                'label' => false,
                 'constraints' => [
                     new NotBlank(),
                 ],
@@ -35,7 +35,7 @@ class CommentType extends AbstractType
             ->add('submit', SubmitType::class, [
                 'label' => 'comment.submit',
                 'attr' => [
-                    'class' => 'btn btn-primary mt-2',
+                    'class' => 'btn btn-success mt-2',
                 ],
             ])
         ;

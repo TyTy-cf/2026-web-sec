@@ -38,7 +38,7 @@ class TopicType extends AbstractType
             ->add('submit', SubmitType::class, [
                 'label' => 'form.save_changes',
                 'attr' => [
-                    'class' => 'btn btn-primary mt-2',
+                    'class' => 'btn btn-success mt-2',
                 ],
             ])
         ;

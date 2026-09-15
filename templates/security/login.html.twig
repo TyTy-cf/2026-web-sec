@@ -17,7 +17,7 @@
         <h1 class="h3 mb-3 font-weight-normal">{{ 'security.sign_in_heading'|trans }}</h1>
         <label for="username">{{ 'security.email_label'|trans }}</label>
         <input type="email" value="{{ last_username }}" name="_username" id="username" class="form-control" autocomplete="email" required autofocus>
-        <label for="password">{{ 'security.password_label'|trans }}</label>
+        <label class="mt-2" for="password">{{ 'security.password_label'|trans }}</label>
         <input type="password" name="_password" id="password" class="form-control" autocomplete="current-password" required>
         <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="{{ csrf_token('authenticate') }}">
 
@@ -31,7 +31,7 @@
             </div>
         #}
 
-        <button class="btn btn-lg btn-primary" type="submit">
+        <button class="btn btn-lg btn-success mt-2" type="submit">
             {{ 'security.sign_in'|trans }}
         </button>
     </form>
