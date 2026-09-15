@@ -29,27 +29,7 @@
 
 2. **Confirmer qu'il est stocké et non réfléchi.** Ouvrez la même page de sujet dans une fenêtre de navigation privée (ou déconnectez-vous et reconnectez-vous avec un autre utilisateur prérempli). Si la charge utile s'exécute toujours pour un visiteur qui ne l'a jamais soumise lui-même, vous avez confirmé un **XSS stocké** : la charge utile réside dans la base de données et cible chaque futur visiteur de cette page.
 
-3. **Aller au-delà d'une simple popup : démontrer un impact réel.** Un simple `alert(1)` prouve l'exécution de code, mais ne démontre pas pourquoi cela est dangereux. Essayez d'illustrer une action effectuée *au nom de la victime* sans son consentement, par exemple une charge utile qui soumet silencieusement un autre commentaire via `fetch()` lors du chargement de la page :
-   ```html
-   <script>
-   
-    window.addEventListener('load', () => {
-        const inputToken = document.querySelector('[name="comment[_token]"]').value;
-        if (inputToken) {
-            fetch(window.location.href, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-           body: new URLSearchParams({
-             'comment[content]': 'posted automatically by XSS',
-             'comment[submit]': '',
-             'comment[_token]': inputToken,
-           }),
-         });
-        }
-   });
-   </script>
-   ```
-   On récupère le jeton CSRF directement depuis la page sur laquelle elle s'exécute. Étant donné qu'elle s'exécute *en tant que* navigateur d'un visiteur authentifié, elle a accès à tout ce que contient le DOM de ce visiteur, y compris le jeton. Notez que vous n'avez eu besoin de lire aucun cookie pour faire cela : le navigateur joint automatiquement la session de la victime. Essayez `document.cookie` dans la console sur cette page : le cookie de session est configuré en `HttpOnly` et n'apparaîtra pas. **Il s'agit d'une réelle mesure d'atténuation, mais elle n'empêche pas l'attaque ci-dessus** ; elle bloque seulement une méthode spécifique d'abus de session (l'exfiltration de cookies), pas les autres (agir directement en tant que la victime)
+3. **Aller au-delà d'une simple popup : démontrer un impact réel.** Un simple `alert(1)` prouve l'exécution de code, mais ne démontre pas pourquoi cela est dangereux. Essayez d'illustrer une action effectuée *au nom de la victime* sans son consentement, par exemple une charge utile qui soumet silencieusement un autre commentaire via `fetch()` lors du chargement de la page
 
 
 ## Vous devez avoir fait
@@ -105,3 +85,45 @@
 
 - Mettez en place le correctif pour empêcher un utilisateur d'éditer un sujet qui ne lui appartient pas. Le bouton **Edit** déjà masqué pour les non-auteurs dans le gabarit ne compte pas comme un correctif : il ne fait que cacher le lien, pas protéger la ressource elle-même
 - Assurez-vous que l'on doit bien être connecté pour accéder au formulaire
+
+
+# Exercice 3 — Cross-Site Scripting (XSS
+
+
+## Pour commencer
+
+
+- Une barre de recherche a été ajoutée dans l'en-tête du site, entre le lien "Reddit-Ish" et la partie connexion/déconnexion. Elle permet de rechercher un sujet par son titre
+- Vous n'avez pas besoin d'être connecté pour utiliser cette fonctionnalité
+
+
+## Mission
+
+
+1. **Utiliser la fonctionnalité normalement.** Recherchez le titre (ou une partie du titre) d'un sujet existant et vérifiez que le ou les résultats s'affichent correctement
+2. **Observer comment la recherche est affichée.** Après une recherche, votre terme de recherche reste affiché dans le champ de recherche de l'en-tête. Regardez le code source de la page (pas juste le rendu) autour de ce champ : comment votre terme y est-il inséré ?
+3. **Essayer une première charge utile évidente.** Essayez de rechercher :
+   ```html
+   <script>document.title = 'XSS'</script>
+   ```
+   Que se passe-t-il ? Le titre de l'onglet change-t-il ? Regardez à nouveau le code source à l'endroit où votre terme de recherche apparaît : que sont devenus les caractères `<` et `>` ?
+4. **Comprendre pourquoi ça ne marche pas, et trouver ce qui marche.** L'affichage échappe bien les caractères spéciaux... mais un caractère très commun, présent dans quasiment tous les payloads d'exemple, n'est lui jamais échappé nulle part. Repérez-le dans le code source du champ de recherche, et déduisez ce que cela permet d'injecter à cet endroit précis (indice : ce n'est plus une balise, mais un attribut HTML)
+5. **Construire un payload qui s'exécute sans clic.** Une fois l'injection d'attribut trouvée, un simple `onclick` ne suffit pas à prouver l'impact puisqu'il faudrait que la victime clique dessus. Trouvez une combinaison d'attributs HTML permettant de déclencher du JavaScript automatiquement, dès le chargement de la page (par exemple en rendant le champ automatiquement focus)
+6. **Confirmer qu'il est réfléchi et non stocké.** Envoyez le lien contenant votre charge utile à quelqu'un d'autre (ou ouvrez-le dans une autre fenêtre, sans rien resaisir). Le script s'exécute-t-il pour lui aussi ? Maintenant, effectuez une nouvelle recherche anodine, puis revenez à la page d'accueil sans repasser par ce lien précis : la charge utile est-elle toujours là ? Comparez avec ce que vous aviez observé à l'exercice 1
+7. **Imaginer un scénario d'attaque réel.** Un attaquant ne peut pas forcer une victime à taper quelque chose dans un champ de recherche. Comment pourrait-il malgré tout amener une victime à déclencher cette charge utile ?
+
+
+## Vous devez avoir fait
+
+
+- Constaté que le `<script>` seul ne s'exécute pas, et compris pourquoi (les caractères `<` et `>` sont échappés)
+- Identifié le caractère qui, lui, n'est jamais échappé, et ce qu'il permet à cet endroit du code
+- Obtenu l'exécution de JavaScript, sans interaction de la victime, via le paramètre `q` de l'URL, sans qu'aucune balise `<script>` n'apparaisse dans votre charge utile finale
+- Décrit comment cette charge utile pourrait concrètement être livrée à une victime (lien, redirection, etc.)
+
+
+## Correctif
+
+
+- Mettez en place le correctif pour éviter que cela ne se reproduise
+- Quel type de faille XSS vient-on de corriger ?

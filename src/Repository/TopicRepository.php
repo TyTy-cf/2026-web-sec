@@ -16,28 +16,36 @@ class TopicRepository extends ServiceEntityRepository
         parent::__construct($registry, Topic::class);
     }
 
-    //    /**
-    //     * @return Topic[] Returns an array of Topic objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('t')
-    //            ->andWhere('t.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('t.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+    /**
+     * @return Topic[] Returns an array of Topic objects
+     */
+    public function search(string $query): array
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.title LIKE :query')
+            ->setParameter('query', '%' . $query . '%')
+            ->orderBy('t.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult()
+        ;
+    }
 
-    //    public function findOneBySomeField($value): ?Topic
-    //    {
-    //        return $this->createQueryBuilder('t')
-    //            ->andWhere('t.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+    /**
+     * @return Topic[] Returns an array of Topic objects
+     */
+    public function LastByCreatedAt(?int $limit = null): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->join('t.category', 'c')
+            ->join('t.author', 'u')
+            ->select('t', 'c', 'u')
+            ->orderBy('t.createdAt', 'DESC');
+
+        if ($limit !== null) {
+            $qb->setMaxResults($limit);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
 }

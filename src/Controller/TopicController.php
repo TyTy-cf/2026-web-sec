@@ -7,6 +7,7 @@ use App\Entity\Topic;
 use App\Entity\User;
 use App\Form\CommentType;
 use App\Form\TopicType;
+use App\Repository\TopicRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -15,6 +16,17 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class TopicController extends AbstractController
 {
+
+    #[Route('/search', name: 'app_topic_search')]
+    public function search(Request $request, TopicRepository $topicRepository): Response
+    {
+        $query = $request->query->get('q', '');
+
+        return $this->render('front/topic/search.html.twig', [
+            'query' => $query,
+            'topics' => $topicRepository->search($query),
+        ]);
+    }
 
     #[Route('/topics/{id}', name: 'app_topic_show')]
     public function show(

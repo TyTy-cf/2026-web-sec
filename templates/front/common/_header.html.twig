@@ -5,6 +5,10 @@
         <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+        <form class="d-flex mx-auto" method="get" action="{{ path('app_topic_search') }}">
+            <input class="form-control me-2" type="search" name="q" value={{ app.request.query.get('q') }} placeholder="Search topics..." aria-label="Search">
+            <button class="btn btn-outline-primary" type="submit">Search</button>
+        </form>
         <div class="navbar-nav">
             {% if app.user %}
                 Logged as <span class="text-muted mx-2"> {{ app.user.nickname }} </span>

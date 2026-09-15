@@ -1,0 +1,26 @@
+{% extends 'front/base.html.twig' %}
+
+{% block title %}Search - Reddit-Ish{% endblock %}
+
+{% block body %}
+    <h1 class="my-4">Search results for "{{ query }}"</h1>
+
+    {% for topic in topics %}
+        <div class="card mb-3 col-6 mx-auto">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a>
+                </h5>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    {{ topic.category.name }} &middot; posted by {{ topic.author.nickname }} on {{ topic.createdAt|date('d/m/Y') }}
+                </h6>
+                <p class="card-text">
+                    {{ topic.content|slice(0, 200) }}{% if topic.content|length > 200 %}&hellip;{% endif %}
+                </p>
+                <a href="{{ path('app_topic_show', { id: topic.id }) }}" class="btn btn-sm btn-outline-primary">View topic</a>
+            </div>
+        </div>
+    {% else %}
+        <p>No topics found.</p>
+    {% endfor %}
+{% endblock %}

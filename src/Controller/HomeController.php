@@ -14,7 +14,7 @@ final class HomeController extends AbstractController
     public function index(TopicRepository $topicRepository): Response
     {
         return $this->render('front/home/index.html.twig', [
-            'topics' => $topicRepository->findBy([], ['createdAt' => 'DESC'], 20),
+            'topics' => $topicRepository->LastByCreatedAt(20),
         ]);
     }
 
