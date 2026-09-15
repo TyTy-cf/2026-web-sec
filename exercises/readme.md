@@ -67,7 +67,7 @@
 - Quel type de XSS vient-on de corriger ?
 
 
-# Exercice 2 — Contrôle d'accès défaillant
+# Exercice 2 — Broken Access Control
 
 
 ## Pour commencer
