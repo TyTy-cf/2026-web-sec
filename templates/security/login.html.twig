@@ -1,6 +1,6 @@
 {% extends 'front/base.html.twig' %}
 
-{% block title %}Log in!{% endblock %}
+{% block title %}{{ 'security.login_title'|trans }}{% endblock %}
 
 {% block body %}
     <form method="post">
@@ -10,14 +10,14 @@
 
         {% if app.user %}
             <div class="mb-3">
-                You are logged in as {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">Logout</a>
+                {{ 'common.logged_in_as'|trans }} {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">{{ 'common.logout'|trans }}</a>
             </div>
         {% endif %}
 
-        <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
-        <label for="username">Email</label>
+        <h1 class="h3 mb-3 font-weight-normal">{{ 'security.sign_in_heading'|trans }}</h1>
+        <label for="username">{{ 'security.email_label'|trans }}</label>
         <input type="email" value="{{ last_username }}" name="_username" id="username" class="form-control" autocomplete="email" required autofocus>
-        <label for="password">Password</label>
+        <label for="password">{{ 'security.password_label'|trans }}</label>
         <input type="password" name="_password" id="password" class="form-control" autocomplete="current-password" required>
         <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="{{ csrf_token('authenticate') }}">
 
@@ -32,7 +32,7 @@
         #}
 
         <button class="btn btn-lg btn-primary" type="submit">
-            Sign in
+            {{ 'security.sign_in'|trans }}
         </button>
     </form>
 {% endblock %}

@@ -3,7 +3,7 @@
 
 
 - Application : https://localhost:8443/
-- Connectez-vous sur https://localhost:8443/login avec n'importe quel compte prérempli, par exemple :
+- Connectez-vous sur https://localhost:8443/connexion avec n'importe quel compte prérempli, par exemple :
     - email : `carter.davis1@example.com`
     - mot de passe : `123`
       (tous les utilisateurs préremplis partagent ce même mot de passe)
@@ -127,3 +127,46 @@
 
 - Mettez en place le correctif pour éviter que cela ne se reproduise
 - Quel type de faille XSS vient-on de corriger ?
+
+
+# Exercice 4 — DOM-based XSS
+
+
+## Pour commencer
+
+
+- Depuis la page d'accueil, cliquez sur le nom d'une catégorie (par exemple sous un sujet) pour arriver sur sa page de listing
+- Connectez-vous, puis retournez sur cette page de catégorie : un encart **"Share this category with a friend"** apparaît, avec un lien à copier pour l'envoyer à quelqu'un
+
+
+## Mission
+
+
+1. **Utiliser la fonctionnalité normalement.** Copiez le lien de partage, ouvrez-le (par exemple dans une fenêtre privée) : la page vous accueille en mentionnant le nom de la personne qui l'a partagé
+2. **Repérer où vit cette information dans l'URL.** Regardez attentivement l'URL du lien partagé. Quelle partie contient le nom de la personne ? Est-ce un paramètre classique (`?...`) ou autre chose ?
+3. **Vérifier ce que voit le serveur.** Remplacez le nom dans l'URL par une valeur de test bien visible, rechargez la page, puis regardez le code source de la page (clic droit → *Afficher le code source*, ou une requête faite avec un outil en ligne de commande). Votre valeur de test apparaît-elle quelque part dans ce code source ? Que pouvez-vous en déduire sur qui traite réellement cette donnée : le serveur, ou autre chose ?
+4. **Trouver où et comment l'information est affichée.** Cette fois, inspectez la page directement dans les outils de développement du navigateur (onglet *Éléments* / *Elements*, pas le code source). Retrouvez l'endroit où votre valeur de test a été insérée
+5. **Essayer une première charge utile évidente.** Remplacez la valeur par :
+   ```html
+   <script>alert(document.domain)</script>
+   ```
+   Est-ce que ça s'exécute ? Si non, à votre avis pourquoi une balise `<script>` insérée de cette façon ne se déclenche-t-elle pas, contrairement à ce que vous aviez observé aux exercices précédents ?
+6. **Trouver un vecteur qui fonctionne.** Sans utiliser de balise `<script>`, trouvez une balise HTML qui déclenche du JavaScript dès qu'elle est insérée dans la page (indice : un attribut de gestion d'évènement sur une balise qui échoue à charger une ressource, ou qui se déclenche automatiquement)
+7. **Confirmer la nature de la faille.** En vous basant sur ce que vous avez observé à l'étape 3, comment qualifieriez-vous ce type de XSS ? En quoi est-il différent des exercices 1 et 3, alors que le résultat (exécution de JavaScript arbitraire) est similaire ?
+8. **Imaginer un scénario d'attaque réel.** Comment un attaquant pourrait-il pousser une victime à cliquer sur un lien contenant cette charge utile ?
+
+
+## Vous devez avoir fait
+
+
+- Identifié que le nom partagé transite par une partie de l'URL qui n'est jamais envoyée au serveur
+- Constaté qu'une charge utile placée à cet endroit n'apparaît jamais dans le code source ni dans aucune requête réseau, alors qu'elle s'exécute bien dans le navigateur
+- Obtenu l'exécution de JavaScript sans utiliser de balise `<script>`
+- Expliqué pourquoi ce type de XSS ne peut pas être détecté ni corrigé côté serveur, contrairement aux exercices 1 et 3
+
+
+## Correctif
+
+
+- Mettez en place le correctif pour éviter que cela ne se reproduise
+- Ce correctif peut-il être fait côté serveur (Symfony/Twig) ? Pourquoi ?

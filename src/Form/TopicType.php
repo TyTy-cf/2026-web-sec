@@ -17,7 +17,7 @@ class TopicType extends AbstractType
     {
         $builder
             ->add('title', TextType::class, [
-                'label' => 'Title',
+                'label' => 'form.topic_title_label',
                 'constraints' => [
                     new NotBlank(),
                 ],
@@ -26,7 +26,7 @@ class TopicType extends AbstractType
                 ],
             ])
             ->add('content', TextareaType::class, [
-                'label' => 'Content',
+                'label' => 'form.topic_content_label',
                 'constraints' => [
                     new NotBlank(),
                 ],
@@ -36,7 +36,7 @@ class TopicType extends AbstractType
                 ],
             ])
             ->add('submit', SubmitType::class, [
-                'label' => 'Save changes',
+                'label' => 'form.save_changes',
                 'attr' => [
                     'class' => 'btn btn-primary mt-2',
                 ],

@@ -38,7 +38,7 @@ Laisser l'autoescape Twig faire son travail (retirer `|raw`).
 
 ## Exercice 2 — Broken Access Control
 
-**Code à recevoir** : pas de payload, juste la démonstration (URL de `/topics/{id}/edit` avec l'ID d'un sujet dont il n'est pas l'auteur, formulaire soumis avec succès).
+**Code à recevoir** : pas de payload, juste la démonstration (URL de `/sujets/{id}/modifier` avec l'ID d'un sujet dont il n'est pas l'auteur, formulaire soumis avec succès).
 
 **Fix attendu : un Voter**, pas un simple `if` dans le contrôleur.
 
@@ -103,3 +103,23 @@ class TopicVoter extends Voter
 + <input class="form-control me-2" type="search" name="q" value="{{ app.request.query.get('q') }}" placeholder="Search topics..." aria-label="Search">
 ```
 Il suffit d'ajouter les guillemets autour de la valeur ; l'autoescape Twig fait déjà le reste.
+
+---
+
+## Exercice 4 — DOM-based XSS
+
+**Code à recevoir** : une URL du type `/categorie/1#ref=<img src=x onerror=alert(document.domain)>` (ou tout autre gadget HTML avec handler d'évènement — `<script>` ne fonctionne pas via `innerHTML`, c'est un point de vérification attendu).
+
+**Fix** — `assets/scripts/app.ts` :
+```diff
+      if (ref) {
+-         banner.innerHTML = `<strong>${ref}</strong> pense que cette catégorie va te plaire !`;
++         const strong = document.createElement('strong');
++         strong.textContent = ref;
++
++         banner.append(strong, ' pense que cette catégorie va te plaire !');
+      }
+```
+On construit le DOM avec `createElement`/`textContent`/`append` au lieu de `innerHTML` : `ref` est alors toujours traité comme du texte, jamais parsé comme du HTML, quel que soit son contenu.
+
+Point à vérifier avec le stagiaire : le correctif est **uniquement côté client** (rebuild du JS/TS), rien à changer côté Symfony/Twig — c'est la caractéristique du DOM-based XSS, la faille n'existe jamais côté serveur.

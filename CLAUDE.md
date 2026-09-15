@@ -17,7 +17,7 @@ The project is named "Reddit-Ish", based on "Reddit". A forum-like project, wher
 - Node 22
 
 
-### 1.1 Docker
+### 1.1. Docker
 
 
 The app has docker, with a Makefile to help.
@@ -31,12 +31,21 @@ There is five containers :
 - mariadb-1 : db using mariadb
 
 
+### 1.2. Code convention
+
+
+- title, label, route path are written in French
+- code is written in English, variables, route name, function and class
+- Use translation file for this, only in `messages.fr.yaml`
+
+
 ## 2. Existing features
 
 
 Every "features" include a bad practices on purposes, which exists in OWASP, it also refers to an exercise, written in directory `exercises/readme.md`.
 Each time a "feature" is developed, an exercise has to be written, without giving too much information on what has to be fixed.
 You can look at the previous exercises for inspiration, all exercises have to be written in english.
+Update the `exercise/correction.md` for the expected fix for each exercise.
 
 
 ### 2.1 Persistent XSS
@@ -67,5 +76,17 @@ A search bar was added in the header (centered, between the "home" link and the 
 Twig's default autoescaping still HTML-encodes `<`, `>`, `&`, `"`, `'`, but not spaces, so with the attribute unquoted an attacker can break out of `value=` and inject new attributes (e.g. `?q=x onfocus=alert(1) autofocus=x`) even though the variable is technically "escaped". No `|raw` and no `{% autoescape false %}` anywhere — the bug is purely the missing quotes, which is the realistic version of this mistake.
 
 The files impacted are `TopicController.php` (`search` function), `TopicRepository.php` (`search` method), `templates/front/common/_header.html.twig` (the vulnerable line) and `templates/front/topic/search.html.twig`
+
+
+### 2.4 DOM-based XSS
+
+
+A category page was added, listing the topics of a given category, reachable from the category name link on the home page. Logged-in users get a "Share this category with a friend" box containing a link with `#ref=<their nickname>` appended, so the visitor lands on a page that greets them by name.
+
+- [x] `assets/scripts/app.ts` reads `location.hash` client-side and writes the `ref` value into `#ref-banner` via `innerHTML` without any sanitization, on purpose
+
+The payload never touches the server: the `ref` value lives only in the URL fragment, which browsers never send in the HTTP request, so the server-rendered HTML (and any server-side fix) is always clean. The vulnerability is purely client-side.
+
+The files impacted are `CategoryController.php`, `TopicRepository.php` (`findByCategory` method), `templates/front/category/show.html.twig`, `templates/front/home/index.html.twig` (category link) and `assets/scripts/app.ts` (the vulnerable line)
 
 

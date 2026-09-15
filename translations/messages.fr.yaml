@@ -1,0 +1,54 @@
+common:
+    home: Accueil
+    edit: Modifier
+    login: Connexion
+    logout: Déconnexion
+    logged_in_as: Connecté en tant que
+    search: Rechercher
+    search_placeholder: Rechercher des sujets...
+    toggle_navigation: Basculer la navigation
+    posted_by: 'publié par %author% le %date%'
+    view_topic: Voir le sujet
+
+home:
+    title: Accueil - Reddit-Ish
+    latest_topics: Derniers sujets
+    no_topics: Aucun sujet pour le moment.
+
+topic:
+    edit_title: 'Modifier %title%'
+    edit_heading: Modifier le sujet
+    comments_heading: 'Commentaires (%count%)'
+    no_comments: Soyez le premier à commenter.
+    add_comment_heading: Ajouter un commentaire
+
+comment:
+    content_label: Ajouter un commentaire
+    content_placeholder: 'Qu''en pensez-vous ?'
+    submit: Publier le commentaire
+
+form:
+    topic_title_label: Titre
+    topic_content_label: Contenu
+    save_changes: Enregistrer les modifications
+
+category:
+    share_label: 'Partager cette catégorie avec un ami :'
+    no_topics: Aucun sujet dans cette catégorie pour le moment.
+
+search:
+    title: Recherche - Reddit-Ish
+    results_for: 'Résultats de recherche pour « %query% »'
+    no_results: Aucun sujet trouvé.
+
+security:
+    login_title: Connexion
+    sign_in_heading: Veuillez vous connecter
+    email_label: Adresse e-mail
+    password_label: Mot de passe
+    sign_in: Se connecter
+
+flash:
+    login_required: Vous devez être connecté !
+    comment_posted: Votre commentaire a été publié.
+    topic_updated: Le sujet a été mis à jour.

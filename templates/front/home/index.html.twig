@@ -1,9 +1,9 @@
 {% extends 'front/base.html.twig' %}
 
-{% block title %}Reddit-Ish{% endblock %}
+{% block title %}{{ 'home.title'|trans }}{% endblock %}
 
 {% block body %}
-    <h1 class="my-4">Latest topics</h1>
+    <h1 class="my-4">{{ 'home.latest_topics'|trans }}</h1>
 
     {% for topic in topics %}
         <div class="card mb-3 col-6 mx-auto">
@@ -12,7 +12,7 @@
                     <a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a>
                 </h5>
                 <h6 class="card-subtitle mb-2 text-muted">
-                    {{ topic.category.name }} &middot; posted by {{ topic.author.nickname }} on {{ topic.createdAt|date('d/m/Y') }}
+                    <a href="{{ path('app_category_show', { id: topic.category.id }) }}">{{ topic.category.name }}</a> &middot; {{ 'common.posted_by'|trans({'%author%': topic.author.nickname, '%date%': topic.createdAt|date('d/m/Y')}) }}
                 </h6>
                 <div class="d-flex">
                     <img class="img-fluid mx-auto" src="{{ topic.picture ~ '?r=' ~ topic.id }}" alt="Topic {{ topic.id }}">
@@ -20,10 +20,10 @@
                 <p class="card-text">
                     {{ topic.content|slice(0, 200) }}{% if topic.content|length > 200 %}&hellip;{% endif %}
                 </p>
-                <a href="{{ path('app_topic_show', { id: topic.id }) }}" class="btn btn-sm btn-outline-primary">View topic</a>
+                <a href="{{ path('app_topic_show', { id: topic.id }) }}" class="btn btn-sm btn-outline-primary">{{ 'common.view_topic'|trans }}</a>
             </div>
         </div>
     {% else %}
-        <p>No topics yet.</p>
+        <p>{{ 'home.no_topics'|trans }}</p>
     {% endfor %}
 {% endblock %}

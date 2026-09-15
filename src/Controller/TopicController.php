@@ -17,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class TopicController extends AbstractController
 {
 
-    #[Route('/search', name: 'app_topic_search')]
+    #[Route('/recherche', name: 'app_topic_search')]
     public function search(Request $request, TopicRepository $topicRepository): Response
     {
         $query = $request->query->get('q', '');
@@ -28,7 +28,7 @@ final class TopicController extends AbstractController
         ]);
     }
 
-    #[Route('/topics/{id}', name: 'app_topic_show')]
+    #[Route('/sujets/{id}', name: 'app_topic_show')]
     public function show(
         Topic $topic,
         Request $request,
@@ -45,7 +45,7 @@ final class TopicController extends AbstractController
             $author = $this->getUser();
 
             if (!$author) {
-                $this->addFlash('warning', 'You need to be logged in!');
+                $this->addFlash('warning', 'flash.login_required');
                 return $this->redirectToRoute('app_login');
             }
 
@@ -55,7 +55,7 @@ final class TopicController extends AbstractController
             $entityManager->persist($comment);
             $entityManager->flush();
 
-            $this->addFlash('success', 'Your comment has been posted.');
+            $this->addFlash('success', 'flash.comment_posted');
 
             return $this->redirectToRoute('app_topic_show', ['id' => $topic->getId()]);
         }
@@ -67,7 +67,7 @@ final class TopicController extends AbstractController
         ]);
     }
 
-    #[Route('/topics/{id}/edit', name: 'app_topic_edit')]
+    #[Route('/sujets/{id}/modifier', name: 'app_topic_edit')]
     public function edit(
         Topic $topic,
         Request $request,
@@ -81,7 +81,7 @@ final class TopicController extends AbstractController
 
             $entityManager->flush();
 
-            $this->addFlash('success', 'Your topic has been updated.');
+            $this->addFlash('success', 'flash.topic_updated');
 
             return $this->redirectToRoute('app_topic_show', ['id' => $topic->getId()]);
         }

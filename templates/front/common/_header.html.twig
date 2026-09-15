@@ -1,23 +1,26 @@
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand ms-5" href="{{ path('app_home') }}">Reddit-Ish</a>
-    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="{{ 'common.toggle_navigation'|trans }}">
         <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
         <form class="d-flex mx-auto" method="get" action="{{ path('app_topic_search') }}">
-            <input class="form-control me-2" type="search" name="q" value={{ app.request.query.get('q') }} placeholder="Search topics..." aria-label="Search">
-            <button class="btn btn-outline-primary" type="submit">Search</button>
+            <input class="form-control me-2" type="search" name="q"
+                   {% if app.request.query.get('q') is not null %}value={{ app.request.query.get('q') }}{% endif %}
+                   placeholder="{{ 'common.search_placeholder'|trans }}"
+                   aria-label="{{ 'common.search'|trans }}">
+            <button class="btn btn-outline-primary" type="submit">{{ 'common.search'|trans }}</button>
         </form>
         <div class="navbar-nav">
             {% if app.user %}
-                Logged as <span class="text-muted mx-2"> {{ app.user.nickname }} </span>
+                {{ 'common.logged_in_as'|trans }} <span class="text-muted mx-2">{{ app.user.nickname }}</span>
                 <a href="{{ path('app_logout') }}">
-                    Logout
+                    {{ 'common.logout'|trans }}
                 </a>
             {% else %}
                 <a href="{{ path('app_login') }}">
-                    Login
+                    {{ 'common.login'|trans }}
                 </a>
             {% endif %}
         </div>

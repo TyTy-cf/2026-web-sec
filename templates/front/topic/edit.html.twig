@@ -1,17 +1,17 @@
 {% extends 'front/base.html.twig' %}
 
-{% block title %}Edit {{ topic.title }}{% endblock %}
+{% block title %}{{ 'topic.edit_title'|trans({'%title%': topic.title}) }}{% endblock %}
 
 {% block body %}
     <nav aria-label="breadcrumb" class="mt-3">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ path('app_home') }}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('app_home') }}">{{ 'common.home'|trans }}</a></li>
             <li class="breadcrumb-item"><a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a></li>
-            <li class="breadcrumb-item active">Edit</li>
+            <li class="breadcrumb-item active">{{ 'common.edit'|trans }}</li>
         </ol>
     </nav>
 
-    <h1 class="mb-4">Edit topic</h1>
+    <h1 class="mb-4">{{ 'topic.edit_heading'|trans }}</h1>
 
     {{ form_start(topicForm) }}
         {{ form_row(topicForm.title) }}

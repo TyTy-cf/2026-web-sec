@@ -9,25 +9,31 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class CommentType extends AbstractType
 {
+    public function __construct(
+        private readonly TranslatorInterface $translator,
+    ) {
+    }
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder
             ->add('content', TextareaType::class, [
-                'label' => 'Add a comment',
+                'label' => 'comment.content_label',
                 'constraints' => [
                     new NotBlank(),
                 ],
                 'attr' => [
                     'rows' => 3,
-                    'placeholder' => 'What are your thoughts?',
+                    'placeholder' => $this->translator->trans('comment.content_placeholder'),
                     'class' => 'form-control',
                 ],
             ])
             ->add('submit', SubmitType::class, [
-                'label' => 'Post comment',
+                'label' => 'comment.submit',
                 'attr' => [
                     'class' => 'btn btn-primary mt-2',
                 ],

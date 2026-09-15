@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Category;
 use App\Entity\Topic;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -24,6 +25,20 @@ class TopicRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('t')
             ->andWhere('t.title LIKE :query')
             ->setParameter('query', '%' . $query . '%')
+            ->orderBy('t.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult()
+        ;
+    }
+
+    /**
+     * @return Topic[] Returns an array of Topic objects
+     */
+    public function findByCategory(Category $category): array
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.category = :category')
+            ->setParameter('category', $category)
             ->orderBy('t.createdAt', 'DESC')
             ->getQuery()
             ->getResult()
