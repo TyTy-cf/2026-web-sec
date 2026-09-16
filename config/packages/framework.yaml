@@ -3,7 +3,7 @@ framework:
     secret: '%env(APP_SECRET)%'
     session:
         cookie_secure: false
-        cookie_httponly: true
+        cookie_httponly: false
         cookie_samesite: null
 
     #esi: true

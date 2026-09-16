@@ -47,6 +47,7 @@ security:
     sign_in_heading: Veuillez vous connecter
     email_label: Adresse e-mail
     password_label: Mot de passe
+    remember_me_label: Se souvenir de moi
     sign_in: Se connecter
 
 flash:

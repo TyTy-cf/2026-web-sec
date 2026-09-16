@@ -1,0 +1,7 @@
+# Route with no controller: the request never reaches it, it is intercepted
+# upstream by the "api_login" firewall's json_login listener (check_path).
+# Symfony's router still needs a matching route to exist, or it 404s before
+# the firewall gets a chance to authenticate the request.
+api_login_check:
+    path: /api/login_check
+    methods: [POST]

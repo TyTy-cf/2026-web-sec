@@ -276,3 +276,33 @@ Point à faire ressortir : le token est lié à une action *et* à une ressource
 **Catégorie OWASP** : CSRF avait sa propre entrée dans l'OWASP Top 10 2013 (A8). Depuis les éditions 2017 et 2021, elle est fusionnée dans **A01:2021 – Broken Access Control** : un attaquant qui parvient à forcer une action au nom d'une victime exploite, du point de vue du Top 10, une absence de contrôle sur qui/quoi est autorisé à déclencher cette action.
 
 **Hors périmètre de cet exercice** : le contrôle d'accès (vérifier que l'utilisateur est bien connecté, et qu'il est bien l'auteur du commentaire) reste volontairement absent. Ce correctif rend l'action impossible à déclencher *à l'insu* de la victime, mais n'importe quel utilisateur connecté qui construit lui-même la requête `POST` avec un jeton valide (le sien, récupéré sur n'importe quelle page du site) peut toujours supprimer le commentaire d'un autre s'il devine/observe l'ID. Ce sera un exercice séparé (cf. `CLAUDE.md` §3.1) — ne pas le corriger ici, et ne pas pénaliser un stagiaire qui ne l'a pas fait.
+
+---
+
+## Exercice 8 — Integrity of JWT
+
+**Code à recevoir** : pas de code à proprement parler — le payload décodé du jeton (copier/coller depuis jwt.io ou la console), la démonstration qu'un jeton altéré est rejeté, et une explication écrite qui distingue clairement intégrité et confidentialité.
+
+**Payload actuel** (exemple réel obtenu via `POST /api/login_check`) :
+```json
+{
+    "iat": 1789564279,
+    "exp": 1789567879,
+    "roles": ["ROLE_USER"],
+    "username": "carter.davis1@example.com"
+}
+```
+
+**Point à faire émerger en premier — le titre de l'exercice est un piège volontaire.** Demandez au stagiaire de modifier une valeur du payload décodé (ex. `"roles": ["ROLE_ADMIN"]`), de reconstruire un jeton avec cette modification (signature invalide ou absente), et de le présenter à `GET /api/user/me`. La requête est rejetée (`401 Invalid JWT Token`) : la signature RS256 ne correspond plus au contenu modifié. **L'intégrité est donc bien assurée** — personne ne peut altérer un jeton sans posséder la clé privée de l'application. Un stagiaire qui conclut qu'il faut "mieux signer" ou "vérifier la signature" n'a pas compris le problème : c'est déjà fait, et ça fonctionne. Le vrai problème est la **confidentialité** : un JWT est encodé en base64, pas chiffré, donc son contenu est lisible par quiconque le détient, sans avoir besoin de la clé.
+
+**Vulnérabilités attendues dans la réponse** :
+1. **`username` contient l'adresse email en clair.** C'est une donnée personnelle réutilisable ailleurs (autres services, phishing ciblé, credential stuffing). Un jeton intercepté — log applicatif, historique navigateur, proxy, ticket de support avec un jeton collé dedans — révèle directement l'identité réelle d'un utilisateur qui, partout ailleurs sur le site, n'est connu que par son pseudo
+2. **`roles` est exposé sans nécessité.** Moins critique (ça ne révèle qu'un nom de rôle interne, pas une donnée personnelle), mais c'est une information sur le modèle d'autorisation de l'application qui n'a pas besoin d'être publique. Note pour le formateur, à ne pas exiger du stagiaire : dans cette application, ce claim n'est de toute façon *pas utilisé* pour autoriser quoi que ce soit à l'exécution — `JWTAuthenticator::loadUser()` recharge l'utilisateur depuis la base à chaque requête via `app_user_provider` (voir `vendor/lexik/jwt-authentication-bundle/Security/Authenticator/JWTAuthenticator.php`), donc les rôles réellement appliqués viennent de la BDD, pas du jeton. Le stagiaire n'a pas besoin de le savoir : il suffit qu'il identifie qu'exposer `roles` reste une fuite d'information évitable
+
+**Piège classique à anticiper — un champ "url".** Un réflexe naturel est de remplacer `username: "email@..."` par quelque chose qui *ressemble* à un identifiant plus neutre, par exemple une URL du type `/api/user/me`. **C'est un mauvais correctif, ne pas le valider tel quel** : `/api/user/me` est strictement identique pour tous les utilisateurs, ce n'est pas un identifiant, juste une route relative. Or le claim d'identité du jeton (`username`, ou plus généralement ce que configure `lexik_jwt_authentication.user_id_claim`) doit rester unique par utilisateur : c'est cette valeur que `JWTAuthenticator` transmet au `UserProvider` pour retrouver *quel* utilisateur s'authentifie. Une valeur identique pour tout le monde ne protège rien, elle casse purement et simplement l'authentification (impossible de savoir qui est qui). Si le stagiaire propose cette piste, faites-le buter dessus : est-ce que ça fonctionnerait encore pour distinguer deux comptes différents ? Une URL *paramétrée* par utilisateur (ex. `/api/users/{id}`) contournerait ce problème précis, mais n'apporterait rien de plus qu'exposer directement l'`id` — c'est l'identifiant en dessous qui doit être non sensible, pas son emballage
+
+**Correctif attendu** : remplacer l'email par un identifiant non sensible et unique par utilisateur — typiquement l'`id` interne numérique (ou un UUID si l'on veut aussi éviter l'énumération séquentielle). Concrètement :
+- Le formulaire de connexion (`/api/login_check`) continue d'envoyer l'email et le mot de passe : le client connaît déjà son propre email, ce n'est pas ce qui pose problème
+- Ce qui doit changer, c'est ce qui est *réémis* dans le jeton après authentification : personnaliser la génération du payload (écouter l'évènement `lexik_jwt_authentication.on_jwt_created` pour substituer l'`id` à l'email dans `username`) et adapter le provider chargé de recharger l'utilisateur à partir de cet identifiant plutôt que de l'email
+
+**Aller plus loin (optionnel, à valoriser si le stagiaire y pense sans l'exiger)** : proposer de retirer `roles` du payload par principe de minimisation, même si non exploitable aujourd'hui dans cette application précise.

@@ -2,30 +2,44 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\GetCollection;
 use App\Repository\TopicRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 #[ORM\Entity(repositoryClass: TopicRepository::class)]
+#[ApiResource(
+    operations: [
+        new GetCollection(uriTemplate: '/topic'),
+    ],
+    normalizationContext: ['groups' => ['topic:read']],
+)]
 class Topic
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['topic:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180)]
+    #[Groups(['topic:read'])]
     private ?string $title = null;
 
     #[ORM\Column(type: Types::TEXT)]
+    #[Groups(['topic:read'])]
     private ?string $content = null;
 
     #[ORM\Column]
+    #[Groups(['topic:read'])]
     private ?\DateTime $createdAt = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['topic:read'])]
     private ?\DateTime $updatedAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'topics')]
@@ -44,6 +58,7 @@ class Topic
     private Collection $comments;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['topic:read'])]
     private ?string $picture = null;
 
     public function __construct()
@@ -116,6 +131,15 @@ class Topic
         return $this;
     }
 
+    /**
+     * Exposes only the author's nickname to the API, instead of the full User entity.
+     */
+    #[Groups(['topic:read'])]
+    public function getAuthorNickname(): ?string
+    {
+        return $this->author?->getNickname();
+    }
+
     public function getCategory(): ?Category
     {
         return $this->category;
@@ -126,6 +150,12 @@ class Topic
         $this->category = $category;
 
         return $this;
+    }
+
+    #[Groups(['topic:read'])]
+    public function getCategoryName(): ?string
+    {
+        return $this->category?->getName();
     }
 
     /**

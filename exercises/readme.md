@@ -22,7 +22,7 @@
        secret: '%env(APP_SECRET)%'
        session:
            cookie_secure: false
-           cookie_httponly: true
+           cookie_httponly: false
            cookie_samesite: null
 
        #esi: true
@@ -46,7 +46,6 @@
 
 - Retrouvé et lu, dans les DevTools, l'en-tête qui pose le cookie de session, avant et après votre correctif
 - Identifié, via la documentation Symfony, quels attributs du cookie sont absents ou mal configurés par rapport aux valeurs par défaut du framework
-- Pour chaque attribut concerné, expliqué contre quel risque il protège normalement
 - Modifié `config/packages/framework.yaml` et vérifié dans les DevTools que le cookie de session porte désormais les bons attributs
 
 
@@ -296,3 +295,41 @@
 - Cette route ne passe pas par un formulaire Symfony (`FormType`) : vous ne pouvez donc pas compter sur sa protection CSRF automatique, il faut la mettre en œuvre vous-même
 - Repassez par votre page piège une fois le correctif en place : que se passe-t-il désormais ?
 - Cette faille correspond à quelle catégorie de l'OWASP Top 10 aujourd'hui ? A-t-elle toujours eu sa propre catégorie ?
+
+
+# Exercice 8 — Integrity of JWT
+
+
+## Pour commencer
+
+
+- L'application expose une API en `/api`, documentée sur `/api/docs`. Trois routes vous intéressent : `POST /api/login_check` (authentification), `GET /api/topic` (public) et `GET /api/user/me` (nécessite d'être connecté)
+- Connectez-vous via `/api/login_check` avec un des comptes préremplis (directement en HTTP, ou via le bouton **Authorize** de l'interface `/api`) et récupérez le jeton renvoyé
+
+
+## Mission
+
+
+1. **Décoder le jeton.** Un JWT est composé de trois parties séparées par des points. Décodez-les (par exemple sur jwt.io, ou avec `atob()` dans la console sur chacune des deux premières parties) sans jamais fournir de clé ou de secret. Qu'obtenez-vous ?
+2. **Lister ce qui est exposé.** Pour chaque information trouvée dans le payload décodé, demandez-vous : est-ce une donnée que le client connaissait déjà (donc sans risque de la lui renvoyer), ou une information nouvelle que le jeton révèle, potentiellement dangereuse si elle tombe dans de mauvaises mains ?
+3. **Tester ce que la signature protège réellement.** Modifiez une valeur dans le payload décodé (par exemple le rôle), regénérez un jeton avec cette modification (sans le signer correctement), et présentez-le à `GET /api/user/me`. Que se passe-t-il ? Qu'est-ce que cela vous apprend sur ce que la signature garantit — et sur ce qu'elle ne garantit pas ?
+4. **Repositionner le vrai problème.** Au vu de l'étape 3, diriez-vous que l'intégrité du jeton est compromise ? Si non, quelle propriété l'est réellement ? (indice : cherchez la différence entre un jeton *signé* et un jeton *chiffré*)
+5. **Évaluer l'impact concret.** Reprenez la liste de l'étape 2. Laquelle de ces informations, si elle était interceptée (journal applicatif, historique de navigateur, machine partagée, ticket de support avec un jeton copié-collé dedans...), causerait un dommage allant au-delà de Reddit-Ish lui-même ?
+6. **Comparer avec la session du site principal.** Le site utilise par ailleurs un cookie de session (`PHPSESSID`) pour l'authentification classique. Si vous interceptiez ce cookie et le lisiez tel quel, apprendriez-vous quoi que ce soit sur l'utilisateur ? Qu'est-ce qui différencie fondamentalement un identifiant de session d'un JWT ?
+
+
+## Vous devez avoir fait
+
+
+- Décodé votre propre jeton et dressé la liste de tout ce que le payload révèle
+- Modifié le payload d'un jeton et constaté qu'un jeton ainsi altéré est rejeté par l'API, ce qui prouve que la signature protège contre la falsification (intégrité), pas contre la lecture (confidentialité)
+- Identifié précisément quelle information, si elle fuitait, aurait un impact au-delà de ce site, et expliqué pourquoi
+- Expliqué la différence entre l'identifiant de session opaque utilisé côté front et le contenu directement lisible d'un JWT
+
+
+## Correctif
+
+
+- Le jeton doit conserver un identifiant permettant de savoir quel utilisateur il représente : vous ne pouvez donc pas simplement supprimer ce qu'il contient. Quelle valeur proposez-vous pour remplacer ce qui y figure actuellement, qui ne soit ni une donnée personnelle, ni devinable, tout en restant propre à chaque utilisateur ?
+- Le rôle de l'utilisateur doit-il forcément apparaître dans le jeton pour que l'application fonctionne ? Justifiez
+- Quelle propriété avez-vous réellement corrigée : l'intégrité du jeton, ou autre chose ? Une phrase claire est attendue ici

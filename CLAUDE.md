@@ -38,6 +38,7 @@ There is five containers :
 - title, label, route path are written in French
 - code is written in English, variables, route name, function and class
 - Use translation file for this, only in `messages.fr.yaml`
+- Every route called by the API should start with /api/
 
 
 ## 2. Existing features

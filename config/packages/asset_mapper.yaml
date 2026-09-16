@@ -1,8 +1,10 @@
 framework:
     asset_mapper:
-        # The paths to make available to the asset mapper.
-        paths:
-            - assets/
+        # This app's own JS/CSS live under assets/ but are built and served by
+        # webpack-encore (see encore_entry_*_tags() in templates), not the asset
+        # mapper. Only bundle-provided public assets (e.g. api-platform's Swagger
+        # UI) go through the asset mapper here.
+        paths: []
         missing_import_mode: strict
 
 when@prod:
