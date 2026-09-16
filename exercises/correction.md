@@ -1,6 +1,48 @@
 # Correction — usage interne, ne pas commit
 
-## Exercice 1 — Persistent XSS
+## Exercice 1 — Security Misconfiguration (cookie de session)
+
+**Code à recevoir** : pas de payload. Le livrable est la configuration corrigée de `config/packages/framework.yaml`, plus la capture/lecture des attributs du cookie dans les DevTools avant/après.
+
+**État vulnérable** (déjà en place, à connaître pour pouvoir le reproduire) :
+```yaml
+framework:
+    secret: '%env(APP_SECRET)%'
+    session:
+        cookie_secure: false
+        cookie_httponly: true
+        cookie_samesite: null
+
+    #esi: true
+    #fragments: true
+```
+
+**Ce que Symfony fait par défaut** (dès `session: true`, sans rien configurer d'autre) : `cookie_secure: auto` (donc `true` puisque le site tourne en HTTPS), `cookie_httponly: true`, `cookie_samesite: 'lax'`.
+
+**Fix** — revenir à la configuration par défaut, en supprimant simplement le bloc `session` explicite :
+```diff
+ framework:
+     secret: '%env(APP_SECRET)%'
+-    session:
+-        cookie_secure: false
+-        cookie_httponly: true
+-        cookie_samesite: null
++    session: true
+
+     #esi: true
+     #fragments: true
+```
+Une configuration explicite équivalente (`cookie_secure: auto` (ou `true`), `cookie_httponly: true`, `cookie_samesite: 'lax'`) est tout aussi acceptable ; l'essentiel est que le stagiaire comprenne que les valeurs par défaut de Symfony sont déjà correctes et qu'il ne faut pas les redéfinir sans raison.
+
+**Ce qu'il faut faire ressortir avec le stagiaire** :
+- `cookie_secure: false` : le cookie de session peut être envoyé en clair sur une connexion non chiffrée. En local, tout passe par HTTPS (`Caddyfile` ne sert que `https://localhost:8443`), donc l'impact n'est pas démontrable tel quel sur ce projet — mais c'est bien ce que l'attribut `Secure` empêche en production (interception du cookie sur un réseau non maîtrisé, downgrade HTTP)
+- `cookie_samesite: null` : retire l'attribut `SameSite` du cookie. C'est une des protections de base du navigateur contre le CSRF (un cookie `Lax`/`Strict` n'est pas envoyé, ou envoyé de façon restreinte, sur une requête déclenchée depuis un autre site) ; le retirer réactive ce vecteur pour toutes les routes de l'application, y compris celles qui n'ont pas de jeton CSRF (cf. la démo `app_comment_delete`)
+- `cookie_httponly: true` est volontairement laissé intact : c'est ce qui explique pourquoi `document.cookie` ne renvoie rien lors de la démonstration de l'exercice 2 (XSS persistant) — ce n'est pas cassé ici, il ne faut pas que le stagiaire le "corrige" ou le commente par erreur
+- Catégorie OWASP Top 10 : **A05:2021 – Security Misconfiguration** (des protections existent et sont actives par défaut dans le framework, mais ont été désactivées explicitement)
+
+---
+
+## Exercice 2 — Persistent XSS
 
 **Code à recevoir** : un commentaire contenant un `<script>`, puis une version qui exécute une action (ex. `fetch()` qui soumet un commentaire au nom de la victime).
 
@@ -36,7 +78,7 @@ Laisser l'autoescape Twig faire son travail (retirer `|raw`).
 
 ---
 
-## Exercice 2 — Broken Access Control
+## Exercice 3 — Broken Access Control
 
 **Code à recevoir** : pas de payload, juste la démonstration (URL de `/sujets/{id}/modifier` avec l'ID d'un sujet dont il n'est pas l'auteur, formulaire soumis avec succès).
 
@@ -93,7 +135,7 @@ class TopicVoter extends Voter
 
 ---
 
-## Exercice 3 — Reflected XSS
+## Exercice 4 — Reflected XSS
 
 **Code à recevoir** : une URL du type `?q=x onfocus=alert(1) autofocus=x` (ou équivalent), avec la popup qui se déclenche sans clic.
 
@@ -106,7 +148,7 @@ Il suffit d'ajouter les guillemets autour de la valeur ; l'autoescape Twig fait 
 
 ---
 
-## Exercice 4 — DOM-based XSS
+## Exercice 5 — DOM-based XSS
 
 **Code à recevoir** : une URL du type `/categorie/1#ref=<img src=x onerror=alert(document.domain)>` (ou tout autre gadget HTML avec handler d'évènement — `<script>` ne fonctionne pas via `innerHTML`, c'est un point de vérification attendu).
 
@@ -126,9 +168,9 @@ Point à vérifier avec le stagiaire : le correctif est **uniquement côté clie
 
 ---
 
-## Exercice 5 — Content Security Policy
+## Exercice 6 — Content Security Policy
 
-**Code à recevoir** : pas de payload. Le livrable est une politique CSP fonctionnelle (preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 1, 3 et 4 sont neutralisés sans avoir touché au code vulnérable.
+**Code à recevoir** : pas de payload. Le livrable est une politique CSP fonctionnelle (preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 2, 4 et 5 sont neutralisés sans avoir touché au code vulnérable.
 
 **Point de départ attendu** : le stagiaire doit remarquer que `security.yaml` ne gère que l'authentification/autorisation (firewalls, providers, access_control), et chercher ailleurs. Deux réponses valables, au choix :
 
@@ -162,15 +204,17 @@ https://localhost:8443 {
 Une troisième réponse (un `EventSubscriber` sur `kernel.response` qui ajoute l'en-tête à la main) est acceptable mais plus lourde qu'utile ici — à mentionner si le stagiaire part dans cette direction, sans le pénaliser.
 
 **Vérification à faire avec le stagiaire** :
-- Sans `'unsafe-inline'` dans `script-src`, les balises `<script>` injectées (exercice 1) et les gestionnaires d'évènements inline (`onerror=`, `onfocus=`, exercices 3 et 4) sont bloqués par le navigateur, qui affiche une erreur *Refused to execute inline script/event handler because it violates the following Content Security Policy directive* dans la console — **sans que le code vulnérable n'ait changé**. C'est le point pédagogique central : la CSP est une mesure de défense en profondeur, pas un correctif
+- Sans `'unsafe-inline'` dans `script-src`, les balises `<script>` injectées (exercice 2) et les gestionnaires d'évènements inline (`onerror=`, `onfocus=`, exercices 4 et 5) sont bloqués par le navigateur, qui affiche une erreur *Refused to execute inline script/event handler because it violates the following Content Security Policy directive* dans la console — **sans que le code vulnérable n'ait changé**. C'est le point pédagogique central : la CSP est une mesure de défense en profondeur, pas un correctif
 - **Régression attendue** : l'input `#share-link` de `templates/front/category/show.html.twig` a un `onclick="this.select()"` inline, qui est lui aussi bloqué par une politique stricte. Le stagiaire doit le remarquer et le corriger en déplaçant la logique dans `assets/scripts/app.ts` (`document.getElementById('share-link')?.addEventListener('click', ...)`) plutôt qu'en ajoutant `'unsafe-inline'` (ce qui annulerait toute la protection obtenue à l'étape précédente)
 - Une politique qui autorise `'unsafe-inline'` "pour que ça marche plus simplement" doit être considérée comme un échec de l'exercice : ça ne bloque plus rien des exercices précédents
 
 ---
 
-## Démo CSRF (pas encore un exercice) — suppression de commentaire
+## Exercice 7 — Cross-Site Request Forgery (CSRF)
 
-Pas de payload à recevoir ici, c'est une démo faite en cours. Ci-dessous le correctif **CSRF uniquement** (le contrôle d'accès — vérifier que l'utilisateur est bien l'auteur — reste volontairement absent, ce sera un exercice séparé pour les stagiaires).
+**Code à recevoir** : une page HTML piège (peut être un simple fichier ouvert en local, pas besoin de l'héberger) qui déclenche la suppression du commentaire ciblé dès son chargement, par exemple une balise `<img src="https://localhost:8443/commentaires/{id}/supprimer">` ou un formulaire caché qui s'auto-soumet en `GET` vers cette URL. Le commentaire doit disparaître alors que le stagiaire n'a jamais cliqué sur le bouton **Supprimer** de l'interface, tant qu'il est connecté à Reddit-Ish dans le même navigateur. Vérifier aussi qu'il confirme l'absence d'effet une fois déconnecté.
+
+**Pourquoi la protection habituelle de Symfony n'a pas suffi ici** : le formulaire de publication de commentaire passe par un `FormType`, qui embarque et vérifie un jeton CSRF automatiquement à chaque soumission. La route de suppression, elle, a été écrite à la main (un simple `<a href>` déclenchant un `GET`, sans passer par un objet `Form`) : rien ne la protège par défaut, il faut relire et vérifier le jeton manuellement.
 
 **Fix** — `src/Controller/CommentController.php`, méthode `delete()` : passer la route en `POST` et vérifier un jeton CSRF.
 ```php
@@ -227,4 +271,8 @@ final class CommentController extends AbstractController
                  {% endif %}
 ```
 
-Point à faire ressortir : le token est lié à une action *et* à une ressource précise (`'delete-comment-' . $id`), pas juste à la session globale — ça empêche de réutiliser le token d'un formulaire pour en falsifier un autre. Le contrôle d'accès (vérifier `comment.author === user`) reste à ajouter séparément : ce correctif rend l'action impossible à déclencher *à l'insu* de la victime, mais un utilisateur malveillant qui construit lui-même la requête peut toujours supprimer le commentaire d'un autre s'il devine/observe l'ID.
+Point à faire ressortir : le token est lié à une action *et* à une ressource précise (`'delete-comment-' . $id`), pas juste à la session globale — ça empêche de réutiliser le token d'un formulaire pour en falsifier un autre.
+
+**Catégorie OWASP** : CSRF avait sa propre entrée dans l'OWASP Top 10 2013 (A8). Depuis les éditions 2017 et 2021, elle est fusionnée dans **A01:2021 – Broken Access Control** : un attaquant qui parvient à forcer une action au nom d'une victime exploite, du point de vue du Top 10, une absence de contrôle sur qui/quoi est autorisé à déclencher cette action.
+
+**Hors périmètre de cet exercice** : le contrôle d'accès (vérifier que l'utilisateur est bien connecté, et qu'il est bien l'auteur du commentaire) reste volontairement absent. Ce correctif rend l'action impossible à déclencher *à l'insu* de la victime, mais n'importe quel utilisateur connecté qui construit lui-même la requête `POST` avec un jeton valide (le sien, récupéré sur n'importe quelle page du site) peut toujours supprimer le commentaire d'un autre s'il devine/observe l'ID. Ce sera un exercice séparé (cf. `CLAUDE.md` §3.1) — ne pas le corriger ici, et ne pas pénaliser un stagiaire qui ne l'a pas fait.

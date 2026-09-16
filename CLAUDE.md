@@ -8,6 +8,7 @@ It's contains bad practices on purpose, so the trainees will have to fixes them.
 
 The project is named "Reddit-Ish", based on "Reddit". A forum-like project, where user posts topic, post/edit comments, search for topic etc. 
 
+The trainees are Symfony developers, experienced from 11 years to 1, that want to learn more about security in their project, how it's work and best practices. 
 
 ## 1. Project stack
 
@@ -48,22 +49,22 @@ You can look at the previous exercises for inspiration, all exercises have to be
 Update the `exercise/correction.md` for the expected fix for each exercise.
 
 
-### 2.1 Persistent XSS
+### 2.1 Security Misconfiguration — Session cookie
+
+
+Symfony sets secure defaults for the session cookie (`Secure` when the request is served over HTTPS, `HttpOnly`, `SameSite=Lax`) as soon as sessions are enabled, with no extra configuration needed. This exercise breaks those defaults so trainees have to rediscover them by comparing the `Set-Cookie` header in DevTools against what the framework does out of the box.
+
+- [x] `config/packages/framework.yaml` explicitly overrides the defaults with `cookie_secure: false` and `cookie_samesite: null`, on purpose. `cookie_httponly: true` is deliberately left untouched, so the `HttpOnly` mitigation referenced in exercise 2.2 (Persistent XSS correction, about `document.cookie` being empty) still holds
+
+The files impacted are `config/packages/framework.yaml` only, no PHP/Twig code involved.
+
+
+### 2.2 Persistent XSS
 
 
 - [x] Usages of Twig filter `|raw` for `review.content` on purpose
 
 The files impacted are `TopicController.php`, specially `show` function and `front/topic/show.html.twig`
-
-
-### 2.2 Broken Access Control
-
-
-Any user can modify the topic of anyone, no checking on the owner are made.
-
-- [x] Available `Edit button` only for the current user, but no check are made on the page itself
-
-The files impacted are `TopicController.php`, specially `edit` function, and `front/topic/show.html.twig`
 
 
 ### 2.3 Reflected XSS
@@ -90,14 +91,36 @@ The payload never touches the server: the `ref` value lives only in the URL frag
 The files impacted are `CategoryController.php`, `TopicRepository.php` (`findByCategory` method), `templates/front/category/show.html.twig`, `templates/front/home/index.html.twig` (category link) and `assets/scripts/app.ts` (the vulnerable line)
 
 
-### 2.5 Content Security Policy
+### 2.5 Broken Access Control
+
+
+Any user can modify the topic of anyone, no checking on the owner are made.
+
+- [x] Available `Edit button` only for the current user, but no check are made on the page itself
+
+The files impacted are `TopicController.php`, specially `edit` function, and `front/topic/show.html.twig`
+
+
+### 2.6 Content Security Policy
 
 
 Unlike the previous features, this one is a missing hardening measure rather than a bad practice: no CSP header is configured anywhere in the app.
 
 - [x] No `Content-Security-Policy` header on purpose, and no code was written for this exercise
 
-Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.1, 2.3 and 2.4 without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
+Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.2, 2.4 and 2.5 without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
+
+
+### 2.7 Cross-Site Request Forgery (CSRF)
+
+
+`CommentController::delete` — `GET /commentaires/{id}/supprimer` (`app_comment_delete`). The comment-submission form goes through a Symfony `FormType`, which embeds and verifies a CSRF token automatically; this route was hand-built as a bare `<a href>` link instead, so it never goes through that mechanism at all.
+
+- [x] Route deliberately kept as `methods: ['GET']` with no CSRF token check, so it can be triggered from a bare link/image tag on any external page while a victim is logged in, on purpose
+
+The files impacted are `CommentController.php` (`delete` function) and `templates/front/topic/show.html.twig` (the delete link).
+
+Note: the route also has no login check and no ownership check at all — anyone who knows/guesses a comment ID can delete it, logged in or not. That's a separate Broken Access Control issue, deliberately left unfixed by this exercise (its fix only covers CSRF) and reserved for a later exercise, see §3.1.
 
 
 ## 3. Reserved for later (not yet an exercise)
@@ -106,10 +129,10 @@ Trainees have to research where a CSP actually belongs (not `security.yaml`, des
 These exist in the app for live demos during class, but have no entry in `exercises/readme.md` or `exercises/correction.md` yet — don't write one unless asked.
 
 
-### 3.1 Comment delete route (CSRF demo)
+### 3.1 Comment delete route — missing login/ownership check (Broken Access Control)
 
 
-`CommentController::delete` — `GET /commentaires/{id}/supprimer` (`app_comment_delete`). Deletes a comment with **no login check and no ownership check at all**, and is deliberately a `GET` route (no CSRF token involved) so it can be triggered by a bare link/image tag from any page, while the trainer is logged in, to demonstrate CSRF live. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button).
+`CommentController::delete` — even after the CSRF fix from exercise 2.7 (`POST` + token), the route still has **no login check and no ownership check at all**: any authenticated user can delete any comment by ID, not just their own. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button from exercise 2.5).
 
-Planned follow-up (not implemented, not scheduled yet): switch to `POST` + Symfony CSRF token to fix the CSRF issue, and add an ownership/login check (broken access control) as a separate concern for trainees to implement themselves.
+Planned follow-up (not implemented, not scheduled yet): add an ownership/login check as its own exercise, once exercise 2.7 (CSRF) has been covered.
 

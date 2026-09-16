@@ -11,4 +11,5 @@ window.addEventListener('load', () => {
     if (ref) {
         banner.innerHTML = `<strong>${ref}</strong> pense que cette catégorie va te plaire !`;
     }
+
 });
