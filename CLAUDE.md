@@ -142,7 +142,21 @@ Two authentication entry points exist: `/connexion` (`main` firewall, `form_logi
 
 The file impacted is `config/packages/security.yaml` only (unmodified, missing the `login_throttling` block on both `main` and `api_login`). No PHP/Twig code involved. The fix is expected to also touch `composer.json` (`composer require symfony/rate-limiter`).
 
-Note: a follow-up exercise using the generic `symfony/rate-limiter` component directly (for `GET /api/topic`, which isn't an authentication route and so isn't covered by `login_throttling` at all) is planned separately — see §3.2.
+Note: a follow-up exercise using the generic `symfony/rate-limiter` component directly (for `GET /api/topic`, which isn't an authentication route and so isn't covered by `login_throttling` at all) was planned separately and is now implemented, see §2.10.
+
+
+### 2.10 Generic Rate Limiter — public form + public API abuse
+
+
+Follow-up to §2.9 (Login Throttling), deliberately split into its own exercise so trainees exercise the two different shapes `symfony/rate-limiter` takes in a real app. Two targets, added/used for different reasons:
+- `POST /inscription` (`SecurityController::register`, new registration form) — a single, precise action in a classic (non-API) controller. `login_throttling` doesn't apply here (it's not an authentication route), and `/connexion` was already claimed by §2.9, so this route was added specifically to give this exercise its own unclaimed public form
+- `GET /api/topic` — a public, unauthenticated read endpoint; already existed since §2.8 (JWT). Represents protecting a route (or route family) rather than one controller action
+
+- [x] Neither route has any rate limiting, on purpose, and `symfony/rate-limiter` is not installed (same missing-hardening pattern as §2.6/§2.9) — nothing to break, just nothing built yet
+
+The fix is expected to be two different shapes: a `RateLimiterFactoryInterface` injected directly into `SecurityController::register()` for `/inscription` (per-action limiter), and a `kernel.request` event listener/subscriber for `/api/topic` (route-family limiter, since you can't sensibly inject a limiter into every controller that might sit under `/api`). Both were built and verified working during development (temporarily, then reverted) — the actual `config/packages/rate_limiter.yaml`, controller diff, and listener code are documented in full in `exercises/correction.md`.
+
+Note: `/inscription` itself relies on Symfony's default `#[UniqueEntity]` behavior for email uniqueness, which reveals via a distinct field-level error whether an email is already registered. That's deliberately left as-is — it's the target for a separate future exercise, see §3.2. Don't fix it as part of §2.10.
 
 
 ## 3. Reserved for later (not yet an exercise)
@@ -159,10 +173,12 @@ These exist in the app for live demos during class, but have no entry in `exerci
 Planned follow-up (not implemented, not scheduled yet): add an ownership/login check as its own exercise, once exercise 2.7 (CSRF) has been covered.
 
 
-### 3.2 Generic Rate Limiter — public API abuse (`GET /api/topic`)
+### 3.2 Account/email enumeration on `/inscription` (Identification and Authentication Failures)
 
 
-Follow-up to §2.9 (Login Throttling), deliberately split into its own exercise so trainees exercise the two different tools separately: `GET /api/topic` is a public, unauthenticated read endpoint, so `login_throttling` (which only hooks into firewall authentication attempts) does not and cannot apply to it. The goal there is generic abuse/DoS protection (all requests, not just failed logins), using the `symfony/rate-limiter` component directly via a custom listener (e.g. on `kernel.request`) keyed on client IP, returning `429` past the limit.
+Follow-up to §2.10 (Rate Limiter): the registration form added for that exercise uses Symfony's default `#[UniqueEntity(fields: ['email'])]` behavior on `User` (`src/Entity/User.php`), which produces a distinct, field-level validation error ("Cette adresse e-mail est déjà utilisée.") when the submitted email already belongs to an account. Submitting a known email (e.g. `carter.davis1@example.com`) vs. a random one gets a visibly different response — a textbook account-enumeration oracle (CWE-203, mapped under OWASP A07:2021).
 
-Not implemented, not scheduled yet — write this one once §2.9 has been covered and the trainees have seen `symfony/rate-limiter` installed (it's a dependency of `login_throttling` too, so it may already be present in `composer.json` by the time this exercise starts, depending on class order).
+Deliberate pedagogical link to §2.10: rate-limiting `/inscription` (that exercise's fix) slows enumeration down but doesn't remove the oracle — a patient attacker respecting the limit still enumerates every account eventually. Same "defense in depth vs. actual fix" lesson already taught by the CSP exercise (§2.6), from a different angle. Also same OWASP category as §2.9 (Login Throttling), a second angle on A07:2021 worth calling out in the correction.
+
+Not implemented, not scheduled yet — write this one once §2.10 has been covered. The fix should give a uniform response regardless of whether the email exists (no code has been written for this exercise beyond what §2.10 already needed).
 

@@ -1152,7 +1152,8 @@ INSERT INTO `user` (`id`, `email`, `roles`, `password`, `nickname`, `picture`, `
 (197, 'alexander.green197@example.com', '[]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'AlexanderGreen197', 'https://picsum.photos/200', '1990-08-17 16:49:57', '2014-12-08 14:51:13'),
 (198, 'sebastian.davis198@example.com', '[]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'SebastianDavis198', 'https://picsum.photos/200', '1983-02-09 01:00:40', '2010-07-17 13:29:42'),
 (199, 'jack.thomas199@example.com', '[]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'JackThomas199', 'https://picsum.photos/200', '1978-09-01 13:56:51', '2005-10-15 13:02:21'),
-(200, 'emma.morris200@example.com', '[]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'EmmaMorris200', 'https://picsum.photos/200', '1984-11-02 03:13:17', '2014-09-01 21:37:21');
+(200, 'emma.morris200@example.com', '[]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'EmmaMorris200', 'https://picsum.photos/200', '1984-11-02 03:13:17', '2014-09-01 21:37:21'),
+(201, 'admin@redditish.com', '["ROLE_ADMIN"]', '$2y$13$qVdwkq4PWbfvQeXoeH59.OwDLGGjXKFJuGUqDklZxUfY8RNko4.lS', 'Admin', 'https://picsum.photos/200', '1990-01-01 00:00:00', '2026-01-01 00:00:00');
 
 --
 -- Déchargement des données de la table `vote`

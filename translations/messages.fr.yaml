@@ -3,6 +3,7 @@ common:
     edit: Modifier
     delete: Supprimer
     login: Connexion
+    register: Inscription
     logout: Déconnexion
     logged_in_as: Connecté en tant que
     search: Rechercher
@@ -10,6 +11,7 @@ common:
     toggle_navigation: Basculer la navigation
     posted_by: 'publié par %author% le %date%'
     view_topic: Voir le sujet
+    back_office: Back-office
 
 home:
     title: Accueil - Reddit-Ish
@@ -49,8 +51,33 @@ security:
     password_label: Mot de passe
     remember_me_label: Se souvenir de moi
     sign_in: Se connecter
+    no_account: 'Pas encore de compte ? Inscrivez-vous'
+
+register:
+    title: Inscription - Reddit-Ish
+    heading: Créer un compte
+    email_label: Adresse e-mail
+    nickname_label: Pseudo
+    password_label: Mot de passe
+    password_confirm_label: Confirmer le mot de passe
+    submit: S'inscrire
+    has_account: 'Déjà un compte ? Connectez-vous'
 
 flash:
     login_required: Vous devez être connecté !
     comment_posted: Votre commentaire a été publié.
     topic_updated: Le sujet a été mis à jour.
+    account_created: Votre compte a été créé, vous pouvez maintenant vous connecter.
+
+admin:
+    brand: Administration
+    back_to_site: Retour au site
+    menu:
+        dashboard: Tableau de bord
+    dashboard:
+        title: Tableau de bord - Administration
+        heading: Tableau de bord
+        latest_topics: Derniers sujets
+        latest_comments: Derniers commentaires
+        no_topics: Aucun sujet pour le moment.
+        no_comments: Aucun commentaire pour le moment.

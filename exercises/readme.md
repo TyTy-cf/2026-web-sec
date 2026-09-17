@@ -30,6 +30,7 @@
 - [Exercice 7 — Cross-Site Request Forgery (CSRF)](#exercice-7)
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
+- [Exercice 10 — Rate Limiter](#exercice-10)
 
 
 <a id="exercice-1"></a>
@@ -77,33 +78,22 @@
 - Une fois connecté, ouvrez n'importe quel sujet depuis la page d'accueil ; vous verrez le contenu du sujet, ses commentaires et un formulaire pour en publier un nouveau
 
 
-## Mission
+## Questions
 
 
-1. **Trouver le point d'injection.** Publiez un commentaire sur n'importe quel sujet. Essayez un contenu qui serait dangereux s'il atteignait la page sans être échappé, par exemple :
+1. **Trouver le point d'injection.** Publiez un commentaire sur n'importe quel sujet. Essayez un contenu simple dans un premier temps, qui modifie la page du site, par exemple :
    ```html
    <script>document.title = 'XSS'</script>
    ```
    Rechargez la page du sujet. Le titre de l'onglet a-t-il changé ?
 
-2. **Vérifier si la charge utile survit à votre propre session.** Ouvrez la même page de sujet dans une fenêtre de navigation privée (ou déconnectez-vous et reconnectez-vous avec un autre utilisateur prérempli). La charge utile s'exécute-t-elle toujours pour un visiteur qui ne l'a jamais soumise lui-même ? Qu'est-ce que cela vous apprend sur l'endroit où elle réside entre deux requêtes ?
+2. **Vérifier si le payload survit à votre propre session.** Ouvrez la même page de sujet dans une fenêtre de navigation privée (ou déconnectez-vous et reconnectez-vous avec un autre utilisateur). Le payload s'exécute-t-il toujours pour un visiteur qui ne l'a pas soumis lui-même ? Qu'est-ce que cela vous apprend sur l'endroit où elle réside entre deux requêtes ?
 
-3. **Aller au-delà d'une simple popup : démontrer un impact réel.** Un simple `alert(1)` prouve l'exécution de code, mais ne démontre pas pourquoi cela est dangereux. Essayez d'illustrer une action effectuée *au nom de la victime* sans son consentement, par exemple une charge utile qui soumet silencieusement un autre commentaire via `fetch()` lors du chargement de la page
+3. **Aller au-delà d'une simple popup : démontrer un impact réel.** Un simple `alert(1)` prouve l'exécution de code, mais ne démontre pas pourquoi cela est dangereux. Essayez d'illustrer une action effectuée *au nom de la victime* sans son consentement, par exemple un paylaod qui soumet un autre commentaire via `fetch()` lors du chargement de la page
 
+4. **Mettre en place le correctif** : que faire pour éviter cette problématique ?
 
-## Vous devez avoir fait
-
-
-- Une balise `<script>` dans un commentaire et obtenu son exécution lors d'un chargement standard de page (sans astuce dans les outils de développement)
-- Vérifié que cela se déclenche pour une session ou un utilisateur *différent* de celui qui a posté le commentaire
-- Un script effectuant une action au nom de la victime (pas uniquement un `alert()`)
-
-
-## Correctif
-
-
-- Mettez en place le correctif pour éviter que cela ne se reproduise
-- Quel type de XSS vient-on de corriger ?
+5. **Qualifier la faille.** Quel type de XSS vient-on de corriger ?
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -120,36 +110,22 @@
 - Vous n'avez pas besoin d'être connecté pour utiliser cette fonctionnalité
 
 
-## Mission
+## Questions
 
 
 1. **Utiliser la fonctionnalité normalement.** Recherchez le titre (ou une partie du titre) d'un sujet existant et vérifiez que le ou les résultats s'affichent correctement
 2. **Observer comment la recherche est affichée.** Après une recherche, votre terme de recherche reste affiché dans le champ de recherche de l'en-tête. Regardez le code source de la page (pas juste le rendu) autour de ce champ : comment votre terme y est-il inséré ?
-3. **Essayer une première charge utile évidente.** Essayez de rechercher :
+3. **Essayer un payload évident.** Essayez de rechercher :
    ```html
    <script>document.title = 'XSS'</script>
    ```
    Que se passe-t-il ? Le titre de l'onglet change-t-il ? Regardez à nouveau le code source à l'endroit où votre terme de recherche apparaît : que sont devenus les caractères `<` et `>` ?
 4. **Comprendre pourquoi ça ne marche pas, et trouver ce qui marche.** L'affichage échappe bien les caractères spéciaux... mais un caractère très commun, présent dans quasiment tous les payloads d'exemple, n'est lui jamais échappé nulle part. Repérez-le dans le code source du champ de recherche, et déduisez ce que cela permet d'injecter à cet endroit précis (indice : ce n'est plus une balise, mais un attribut HTML)
-5. **Construire un payload qui s'exécute sans clic.** Une fois l'injection d'attribut trouvée, un simple `onclick` ne suffit pas à prouver l'impact puisqu'il faudrait que la victime clique dessus. Trouvez une combinaison d'attributs HTML permettant de déclencher du JavaScript automatiquement, dès le chargement de la page (par exemple en rendant le champ automatiquement focus)
-6. **Tester si la charge utile survit en dehors du lien lui-même.** Envoyez le lien contenant votre charge utile à quelqu'un d'autre (ou ouvrez-le dans une autre fenêtre, sans rien resaisir). Le script s'exécute-t-il pour lui aussi ? Maintenant, effectuez une nouvelle recherche anodine, puis revenez à la page d'accueil sans repasser par ce lien précis : la charge utile est-elle toujours là ? Comparez avec ce que vous aviez observé à l'exercice 2 : qu'est-ce qui diffère dans la façon dont chacune des deux charges utiles persiste, ou non ?
-7. **Imaginer un scénario d'attaque réel.** Un attaquant ne peut pas forcer une victime à taper quelque chose dans un champ de recherche. Comment pourrait-il malgré tout amener une victime à déclencher cette charge utile ?
-
-
-## Vous devez avoir fait
-
-
-- Constaté que le `<script>` seul ne s'exécute pas, et compris pourquoi (les caractères `<` et `>` sont échappés)
-- Identifié le caractère qui, lui, n'est jamais échappé, et ce qu'il permet à cet endroit du code
-- Obtenu l'exécution de JavaScript, sans interaction de la victime, via le paramètre `q` de l'URL, sans qu'aucune balise `<script>` n'apparaisse dans votre charge utile finale
-- Décrit comment cette charge utile pourrait concrètement être livrée à une victime (lien, redirection, etc.)
-
-
-## Correctif
-
-
-- Mettez en place le correctif pour éviter que cela ne se reproduise
-- Quel type de faille XSS vient-on de corriger ?
+5. **Construire un payload qui s'exécute sans clic.** Une fois l'injection d'attribut trouvée, un simple `onclick` ne suffit pas à prouver l'impact puisqu'il faudrait que la victime clique dessus. Trouvez une combinaison d'attributs HTML permettant de déclencher du JavaScript automatiquement, dès le chargement de la page
+6. **Tester si le payload survit en dehors du lien lui-même.** Ouvrez-le lien dans une autre fenêtre, sans rien resaisir. Le script s'exécute-t-il pour lui aussi ? Maintenant, effectuez une nouvelle recherche anodine, puis revenez à la page d'accueil sans repasser par ce lien précis : le payload est-il toujours là ? Comparez avec ce que vous aviez observé à l'exercice 2 : qu'est-ce qui diffère dans la façon dont chacun des deux payload persiste, ou non ?
+7. **Imaginer un scénario d'attaque réel.** Un attaquant ne peut pas forcer une victime à taper quelque chose dans un champ de recherche. Comment pourrait-il malgré tout amener une victime à déclencher ce payload ?
+8. **Mettre en place le correctif** pour éviter que cela ne se reproduise
+9. **Qualifier la faille.** Quel type de faille XSS vient-on de corriger ?
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -166,37 +142,23 @@
 - Connectez-vous, puis retournez sur cette page de catégorie : un encart **"Share this category with a friend"** apparaît, avec un lien à copier pour l'envoyer à quelqu'un
 
 
-## Mission
+## Questions
 
 
 1. **Utiliser la fonctionnalité normalement.** Copiez le lien de partage, ouvrez-le (par exemple dans une fenêtre privée) : la page vous accueille en mentionnant le nom de la personne qui l'a partagé
 2. **Repérer où vit cette information dans l'URL.** Regardez attentivement l'URL du lien partagé. Quelle partie contient le nom de la personne ? Est-ce un paramètre classique (`?...`) ou autre chose ?
 3. **Vérifier ce que voit le serveur.** Remplacez le nom dans l'URL par une valeur de test bien visible, rechargez la page, puis regardez le code source de la page (clic droit → *Afficher le code source*, ou une requête faite avec un outil en ligne de commande). Votre valeur de test apparaît-elle quelque part dans ce code source ? Que pouvez-vous en déduire sur qui traite réellement cette donnée : le serveur, ou autre chose ?
 4. **Trouver où et comment l'information est affichée.** Cette fois, inspectez la page directement dans les outils de développement du navigateur (onglet *Éléments* / *Elements*, pas le code source). Retrouvez l'endroit où votre valeur de test a été insérée
-5. **Essayer une première charge utile évidente.** Remplacez la valeur par :
+5. **Essayer un premier payload évident.** Remplacez la valeur par :
    ```html
    <script>alert(document.domain)</script>
    ```
    Est-ce que ça s'exécute ? Si non, à votre avis pourquoi une balise `<script>` insérée de cette façon ne se déclenche-t-elle pas, contrairement à ce que vous aviez observé aux exercices précédents ?
 6. **Trouver un vecteur qui fonctionne.** Sans utiliser de balise `<script>`, trouvez une balise HTML qui déclenche du JavaScript dès qu'elle est insérée dans la page (indice : un attribut de gestion d'évènement sur une balise qui échoue à charger une ressource, ou qui se déclenche automatiquement)
 7. **Confirmer la nature de la faille.** En vous basant sur ce que vous avez observé à l'étape 3, comment qualifieriez-vous ce type de XSS ? En quoi est-il différent des exercices 2 et 3, alors que le résultat (exécution de JavaScript arbitraire) est similaire ?
-8. **Imaginer un scénario d'attaque réel.** Comment un attaquant pourrait-il pousser une victime à cliquer sur un lien contenant cette charge utile ?
-
-
-## Vous devez avoir fait
-
-
-- Identifié que le nom partagé transite par une partie de l'URL qui n'est jamais envoyée au serveur
-- Constaté qu'une charge utile placée à cet endroit n'apparaît jamais dans le code source ni dans aucune requête réseau, alors qu'elle s'exécute bien dans le navigateur
-- Obtenu l'exécution de JavaScript sans utiliser de balise `<script>`
-- Expliqué pourquoi ce type de XSS ne peut pas être détecté ni corrigé côté serveur, contrairement aux exercices 2 et 3
-
-
-## Correctif
-
-
-- Mettez en place le correctif pour éviter que cela ne se reproduise
-- Ce correctif peut-il être fait côté serveur (Symfony/Twig) ? Pourquoi ?
+8. **Imaginer un scénario d'attaque réel.** Comment un attaquant pourrait-il pousser une victime à cliquer sur un lien contenant ce payload ?
+9. **Mettre en place le correctif** pour éviter que cela ne se reproduise
+10. **Qualifier la faille.** Ce correctif peut-il être fait côté serveur (Symfony/Twig) ? Pourquoi ?
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -209,12 +171,12 @@
 ## Pour commencer
 
 
-- Connectez-vous avec ce compte pour voir le bouton `Edit` :
+- Connectez-vous avec ce compte pour voir le bouton `Edit`, sur le premier topic :
     - `isabella.young62@example.com` / `123`
       (tous les utilisateurs préremplis partagent ce même mot de passe)
 - Un bouton **Edit** a été ajouté sur la page d'un sujet, visible uniquement par son auteur, qui mène vers un formulaire de modification du titre et du contenu
 
-## Mission
+## Questions
 
 
 1. **Utiliser la fonctionnalité normalement.** Avec le premier compte, ouvrez un sujet dont il est l'auteur, cliquez sur **Edit**, modifiez le titre ou le contenu, enregistrez. Vérifiez que la modification est bien prise en compte
@@ -227,20 +189,7 @@
 
 5. **Que se passe t'il avec un utilisateur non connecté ?** Essayez d'accéder au formulaire de modification sans être connecté
 
-
-## Vous devez avoir fait
-
-
-- Modifié avec succès un sujet dont vous n'êtes pas l'auteur, en accédant directement à l'URL du formulaire d'édition (sans passer par un lien affiché dans l'interface)
-- Confirmé, en vous reconnectant avec le compte propriétaire du sujet, que la modification a bien été enregistrée
-- Identifié précisément ce qui, dans la page ou dans la requête, aurait dû être vérifié pour empêcher cela
-
-
-## Correctif
-
-
-- Mettez en place le correctif pour empêcher un utilisateur d'éditer un sujet qui ne lui appartient pas. Le bouton **Edit** déjà masqué pour les non-auteurs dans le gabarit ne compte pas comme un correctif : il ne fait que cacher le lien, pas protéger la ressource elle-même
-- Assurez-vous que l'on doit bien être connecté pour accéder au formulaire
+6. **Mettre en place le correctif.** Empêchez un utilisateur d'éditer un sujet qui ne lui appartient pas, et assurez-vous qu'il faut être connecté pour accéder au formulaire. Le bouton **Edit** déjà masqué pour les non-auteurs dans le gabarit ne compte pas comme un correctif : il ne fait que cacher le lien, pas protéger la ressource elle-même
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -254,35 +203,20 @@
 
 
 - Aucune CSP n'est configurée sur l'application pour l'instant
-- Gardez sous la main les charges utiles des exercices 2, 3 et 4 : vous allez les rejouer plus tard dans cet exercice
+- Gardez sous la main les charges utiles des exercices 2, 3 et 4 : vous allez les rejouer plus tard dans cet exercice (repartez de la branche `main`pour cet exercice, vous devez avoir une branche avec des failles)
 - Vous n'avez pas besoin d'avoir corrigé les exercices précédents pour faire celui-ci
 
 
-## Mission
+## Questions
 
 
 1. **Comprendre l'objectif.** Qu'est-ce qu'une Content Security Policy, et en quoi peut-elle limiter l'impact d'une faille XSS, même sans corriger le bug qui permet l'injection ?
-2. **Trouver où la configurer.** On pourrait penser que ça se passe dans `security.yaml`, vu son nom... regardez ce que ce fichier gère réellement dans une application Symfony. Cherchez comment on ajoute un en-tête `Content-Security-Policy` sur les réponses HTTP de cette stack (Symfony + Caddy). Il existe plusieurs façons de faire, à vous de choisir celle qui vous convient
+2. **Trouver où la configurer.** Cherchez comment on ajoute un en-tête `Content-Security-Policy` sur les réponses HTTP de cette stack (Symfony + Caddy). Il existe plusieurs façons de faire, à vous de choisir celle qui vous convient
 3. **Mettre en place une politique.** Configurez une politique plutôt stricte (par exemple en n'autorisant les scripts et styles qu'en provenance du même site). Vérifiez, dans les outils de développement du navigateur (onglet réseau), que l'en-tête est bien présent sur les réponses
 4. **Rejouer les anciennes charges utiles.** Reprenez les payloads des exercices 2 (commentaire), 3 (recherche) et 4 (partage de catégorie), sans corriger le code vulnérable sous-jacent. Que se passe-t-il maintenant ? Regardez la console du navigateur : un message apparaît-il ?
 5. **Vérifier les dégâts collatéraux.** Une politique stricte peut casser des fonctionnalités légitimes du site qui reposaient sur du JavaScript inline. Explorez le site à la recherche d'une fonctionnalité qui ne marche plus. Trouvez pourquoi, et corrigez-la sans réintroduire de faille
 6. **Prendre du recul.** La CSP a-t-elle corrigé une seule des failles des exercices précédents ? Si un attaquant trouve un moyen de contourner votre politique (par exemple parce qu'elle autorise une source qu'il contrôle), que se passe-t-il ?
-
-
-## Vous devez avoir fait
-
-
-- Expliqué pourquoi `security.yaml` n'est pas le bon endroit pour ça, et où vous avez effectivement placé la configuration
-- Mis en place une CSP dont vous pouvez prouver la présence (en-tête visible dans les réponses HTTP)
-- Constaté que les charges utiles des exercices 2, 3 et 4 sont neutralisées par votre politique, sans avoir touché au code vulnérable
-- Trouvé et corrigé une fonctionnalité légitime cassée par votre politique
-
-
-## Correctif
-
-
-- Il n'y a pas de correctif à proprement parler ici, la CSP *est* le livrable de cet exercice
-- La CSP remplace-t-elle les correctifs des exercices précédents, ou les complète-t-elle ? Justifiez
+7. **Qualifier l'apport de la CSP.** La CSP remplace-t-elle les correctifs des exercices précédents, ou les complète-t-elle ? Justifiez
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -299,34 +233,19 @@
 - Gardez sous la main l'identifiant (`id`) d'un commentaire que vous êtes prêt à voir disparaître pendant cet exercice
 
 
-## Mission
+## Questions
 
 
 1. **Utiliser la fonctionnalité normalement.** Avant de cliquer sur **Supprimer**, ouvrez l'onglet Réseau (Network) des DevTools. Cliquez, puis regardez précisément la requête envoyée : méthode HTTP, présence ou non d'un paramètre de type jeton
-2. **Comparer avec le formulaire de publication d'un commentaire.** Regardez le code source de la page autour du formulaire qui permet de publier un nouveau commentaire (pas le bouton Supprimer). Quelle différence structurelle voyez-vous avec le lien **Supprimer** ? (indice : l'un des deux passe par un vrai formulaire Symfony, l'autre non)
+2. **Comparer avec le formulaire de publication d'un commentaire.** Regardez le code source de la page autour du formulaire qui permet de publier un nouveau commentaire (pas le bouton Supprimer). Quelle différence structurelle voyez-vous avec le lien **Supprimer** ?
 3. **Construire une page piège.** Créez, en dehors du projet, un fichier HTML minimal (pas besoin de l'héberger, un simple fichier ouvert en local dans le navigateur suffit) qui déclenche la suppression d'un commentaire précis dès son chargement, sans aucun clic de la victime
 4. **Déclencher l'attaque.** Toujours connecté à Reddit-Ish dans le même navigateur, ouvrez votre page piège dans un nouvel onglet. Que devient le commentaire ciblé ?
 5. **Vérifier ce qui est réellement nécessaire pour que ça marche.** Déconnectez-vous de Reddit-Ish, puis rouvrez la page piège. Le commentaire est-il supprimé cette fois ? Qu'est-ce que cela vous apprend sur ce dont dépend l'attaque ?
 6. **Identifier précisément ce qui manque.** En comparant avec l'étape 2, qu'est-ce qu'un vrai formulaire Symfony (`FormType`) aurait fourni automatiquement, et que cette route n'a pas ?
 7. **Imaginer un scénario de diffusion réel.** Un attaquant ne peut pas ouvrir cette page à la place de la victime. Comment pourrait-il malgré tout l'amener à l'ouvrir pendant qu'elle est connectée ?
-
-
-## Vous devez avoir fait
-
-
-- Supprimé un commentaire depuis une page HTML totalement extérieure à l'application, sans jamais cliquer sur le bouton **Supprimer** de l'interface elle-même
-- Constaté que la même page piège n'a aucun effet une fois déconnecté de Reddit-Ish
-- Identifié la méthode HTTP utilisée par la route de suppression, et en quoi ce choix facilite l'attaque
-- Comparé avec le formulaire de publication de commentaire pour identifier ce qui protège normalement une action déclenchée par un formulaire Symfony, et ce qui manque ici
-
-
-## Correctif
-
-
-- Mettez en place le correctif pour empêcher que cette suppression puisse être déclenchée depuis une page extérieure
-- Cette route ne passe pas par un formulaire Symfony (`FormType`) : vous ne pouvez donc pas compter sur sa protection CSRF automatique, il faut la mettre en œuvre vous-même
-- Repassez par votre page piège une fois le correctif en place : que se passe-t-il désormais ?
-- Cette faille correspond à quelle catégorie de l'OWASP Top 10 aujourd'hui ? A-t-elle toujours eu sa propre catégorie ?
+8. **Mettre en place le correctif** pour empêcher que cette suppression puisse être déclenchée depuis une page extérieure. Cette route ne passe pas par un formulaire Symfony (`FormType`) : vous ne pouvez donc pas compter sur sa protection CSRF automatique, il faut la mettre en œuvre vous-même
+9. **Revalider l'attaque.** Repassez par votre page piège une fois le correctif en place : que se passe-t-il désormais ?
+10. **Qualifier la faille.** Cette faille correspond à quelle catégorie de l'OWASP Top 10 aujourd'hui ?
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -347,7 +266,7 @@
 - Connectez-vous via `/api/login_check` avec un des comptes préremplis. Soit par Postman/Insomnia ou via le bouton **Authorize** de l'interface `/api`) et récupérez le jeton renvoyé
 
 
-## Missions
+## Questions
 
 
 1. **Décoder le jeton.** Un JWT est composé de trois parties séparées par des points. Décodez-les, par exemple sur `jwt.io`. Qu'obtenez-vous ?
@@ -355,23 +274,9 @@
 3. **Tester ce que la signature protège réellement.** Modifiez une valeur dans le payload décodé (par exemple le rôle), regénérez un jeton avec cette modification, et présentez-le à `GET /api/user/me`. Que se passe-t-il ?
 4. **Évaluer l'impact concret.** Reprenez la liste de l'étape 2. Laquelle de ces informations, si elle était interceptée, causerait un dommage allant au-delà de Reddit-Ish lui-même ?
 5. **Comparer avec la session du site principal.** Le site utilise par ailleurs un cookie de session (`PHPSESSID`) pour l'authentification classique. Si vous interceptiez ce cookie et le lisiez tel quel, apprendriez-vous quoi que ce soit sur l'utilisateur ? Qu'est-ce qui différencie fondamentalement un identifiant de session d'un JWT ?
-
-
-## Vous devez avoir fait
-
-
-- Décodé votre propre jeton et dressé la liste de tout ce que le payload révèle
-- Modifié le payload d'un jeton et constaté qu'un jeton ainsi altéré est rejeté par l'API, ce qui prouve que la signature protège contre la falsification (intégrité), pas contre la lecture (confidentialité)
-- Identifié précisément quelle information, si elle fuitait, aurait un impact au-delà de ce site, et expliqué pourquoi
-- Expliqué la différence entre l'identifiant de session opaque utilisé côté front et le contenu directement lisible d'un JWT
-
-
-## Correctif
-
-
-- Le jeton doit conserver un identifiant permettant de savoir quel utilisateur il représente : vous ne pouvez donc pas simplement supprimer ce qu'il contient. Quelle valeur proposez-vous pour remplacer ce qui y figure actuellement, qui ne soit ni une donnée personnelle, ni devinable, tout en restant propre à chaque utilisateur ?
-- Le rôle de l'utilisateur doit-il forcément apparaître dans le jeton pour que l'application fonctionne ? Justifiez
-- Quelle propriété avez-vous réellement corrigée : l'intégrité du jeton, ou autre chose ? Une phrase claire est attendue ici
+6. **Mettre en place le correctif.** Le jeton doit conserver un identifiant permettant de savoir quel utilisateur il représente : vous ne pouvez donc pas simplement supprimer ce qu'il contient. Quelle valeur proposez-vous pour remplacer ce qui y figure actuellement, qui ne soit ni une donnée personnelle, ni devinable, tout en restant propre à chaque utilisateur ? Implémentez ce correctif
+7. **Reconsidérer le rôle.** Le rôle de l'utilisateur doit-il forcément apparaître dans le jeton pour que l'application fonctionne ? Justifiez
+8. **Qualifier la faille.** Quelle propriété avez-vous réellement corrigée : l'intégrité du jeton, ou autre chose ? Une phrase claire est attendue ici
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -389,37 +294,45 @@
 - Gardez sous la main un compte prérempli valide (par exemple `carter.davis1@example.com` / `123`) pour vérifier, après votre correctif, que la connexion légitime fonctionne toujours
 
 
-## Mission
+## Questions
 
 
 1. **Constater l'absence de protection.** Tentez plusieurs connexions successives avec un mauvais mot de passe sur `/connexion` (une vingtaine de tentatives, à la main ou via un petit script/`curl` en boucle). Que se passe-t-il après la 5e tentative ? La 10e ? La 20e ? Un ralentissement, un blocage, un message différent apparaissent-ils à un moment ?
 2. **Refaire le même test sur l'API.** Bouclez sur `POST /api/login_check` avec un mauvais mot de passe (via `curl`, Postman, ou le bouton **Authorize** de `/api/docs`). Comparez avec ce que vous avez observé à l'étape 1
-3. **Comprendre le risque.** Pourquoi l'absence de toute limite sur ces deux routes pose problème ? Quel(s) type(s) d'attaque cela facilite-t-il (dictionnaire de mots de passe, credential stuffing, essai systématique d'un mot de passe commun sur beaucoup de comptes...) ? Combien de temps faudrait-il, en théorie, à un script pour tester 10 000 mots de passe sur un compte connu si rien ne le ralentit ?
-4. **Chercher la fonctionnalité Symfony adaptée.** Sans écrire de code tout de suite, cherchez dans la documentation Symfony la protection native contre le brute-force sur les routes d'authentification (indice de recherche : "login throttling"). Notez qu'un autre mécanisme, au nom proche, existe aussi dans Symfony pour un usage différent — on ne le voit pas dans cet exercice, ce sera l'objet d'un exercice séparé, ne vous en préoccupez pas ici
-5. **Identifier où configurer la protection.** `security.yaml` définit plusieurs `firewalls`, un par grande zone de l'application. Lesquels sont concernés par `/connexion` et par `/api/login_check` respectivement ? (revoir le fichier au besoin)
-6. **Mettre en place la protection sur les deux routes.** Configurez le login throttling sur le ou les firewalls concernés. Choisissez un nombre de tentatives et une fenêtre de temps qui vous semblent raisonnables pour un site public
-7. **Vérifier le blocage.** Répétez les étapes 1 et 2. Après combien de tentatives échouées êtes-vous bloqué ? Quel code HTTP et quel message obtenez-vous désormais ? Le comportement est-il le même sur les deux routes ?
-8. **Vérifier qu'un utilisateur légitime n'est pas pénalisé inutilement.** Avec un compte valide, un mot de passe correct dès la première tentative est-il toujours accepté ? Et si vous vous trompez une ou deux fois avant de retaper le bon mot de passe (dans la limite du seuil choisi) ?
-9. **Aller lire le code.** Le paquet installé pour cette protection embarque sa propre implémentation, lisible dans `vendor/symfony/security-http/RateLimiter/DefaultLoginRateLimiter.php` (et `vendor/symfony/security-bundle/DependencyInjection/Security/Factory/LoginThrottlingFactory.php` pour la configuration par défaut). Combien de limiteurs distincts sont réellement utilisés pour une seule tentative de connexion ? Sur quelle clé chacun est-il basé (identifiant seul ? IP seule ? une combinaison ?) ? Que protège chacun d'eux, précisément, l'un que l'autre ne protège pas ?
-10. **Rejouer une tentative de connexion réussie juste après un blocage.** Une fois le seuil atteint pour un compte donné, tentez de vous reconnecter à ce même compte avec le **bon** mot de passe, toujours depuis la même machine. Est-ce accepté ? Qu'est-ce que ça vous apprend sur *à quel moment* le blocage agit par rapport à la vérification du mot de passe ?
+3. **Comprendre le risque.** Pourquoi l'absence de toute limite sur ces deux routes pose problème ? Quel(s) type(s) d'attaque cela facilite-t-il ? Combien de temps faudrait-il, en théorie, à un script pour tester 10 000 mots de passe sur un compte connu si rien ne le ralentit ?
+4. **Chercher la fonctionnalité Symfony adaptée.** Sans écrire de code tout de suite, cherchez dans la documentation Symfony la protection native contre le brute-force sur les routes d'authentification
+5. **Mettre en place la protection sur les deux routes.** Configurez la protection sur le ou les firewalls concernés. Choisissez un nombre de tentatives et une fenêtre de temps qui vous semblent raisonnables pour un site public
+6. **Vérifier le blocage.** Répétez les étapes 1 et 2. Après combien de tentatives échouées êtes-vous bloqué ? Quel code HTTP et quel message obtenez-vous désormais ? Le comportement est-il le même sur les deux routes ?
+7. **Vérifier qu'un utilisateur légitime n'est pas pénalisé inutilement.** Avec un compte valide, un mot de passe correct dès la première tentative est-il toujours accepté ? Et si vous vous trompez une ou deux fois avant de retaper le bon mot de passe (dans la limite du seuil choisi) ?
+8. **Rejouer une tentative de connexion réussie juste après un blocage.** Une fois le seuil atteint pour un compte donné, tentez de vous reconnecter à ce même compte avec le **bon** mot de passe, toujours depuis la même machine. Est-ce accepté ? Qu'est-ce que ça vous apprend sur *à quel moment* le blocage agit par rapport à la vérification du mot de passe ?
+9. **Documenter le correctif.** Quelle configuration avez-vous utilisée, et pour quel(s) firewall(s) ?
+10. **Qualifier la faille.** Cette faille correspond à quelle catégorie de l'OWASP Top 10 ?
 
 
-## Vous devez avoir fait
+[⬆ Retour au sommaire](#sommaire)
 
 
-- Constaté, avant correctif, qu'aucun nombre de tentatives de connexion échouées ne bloque quoi que ce soit, ni sur `/connexion` ni sur `/api/login_check`
-- Configuré le login throttling sur le(s) firewall(s) concerné(s) par les deux routes
-- Constaté un blocage effectif après le seuil choisi, sur les deux routes, avec un code HTTP et un message explicites
-- Vérifié qu'un compte légitime peut toujours se connecter tant que le seuil n'est pas dépassé
-- Lu le code source de l'implémentation Symfony et identifié qu'il combine (au moins) deux limiteurs différents, avec des clés et des objectifs différents
+<a id="exercice-10"></a>
+# Exercice 10 — Rate Limiter
 
 
-## Correctif
+## Pour commencer
 
 
-- Quelle configuration avez-vous utilisée, et pour quel(s) firewall(s) ?
-- D'après votre lecture du code à l'étape 9 : ce mécanisme protège-t-il contre un attaquant qui répartirait ses tentatives sur un grand nombre d'adresses IP différentes (par exemple depuis un réseau de machines compromises) ? Justifiez à partir de ce que vous avez lu, pas d'une impression
-- Cette faille correspond à quelle catégorie de l'OWASP Top 10 ?
+- Un formulaire d'inscription existe sur la route `/inscription`
+- Deux routes publiques n'ont aujourd'hui aucune limite de requêtes : `POST /inscription` et `GET /api/topic`
+- Ces deux routes représentent deux cas différents : une action précise dans une application classique (le formulaire), et toute une famille de routes d'une API (`/api/topic`). Les deux se protègent avec le même composant, mais pas de la même façon
+
+
+## Questions
+
+
+1. **Constater l'absence de limite sur `/inscription`.** Soumettez le formulaire en boucle (script, `curl`, ou juste plusieurs clics rapides) avec des emails différents à chaque fois. Combien de comptes créez-vous avant qu'un blocage n'apparaisse ?
+2. **Constater l'absence de limite sur l'API.** Bouclez sur `GET /api/topic`. Même constat ?
+3. **Installer le composant Rate Limiter de Symfony** s'il n'est pas déjà présent (`composer show symfony/rate-limiter`)
+4. **Protéger `/inscription`.** Limitez le nombre de soumissions par adresse IP
+5. **Protéger `GET /api/topic`.** Cette fois, la protection doit s'appliquer à une route (ou une famille de routes), pas à une seule action précise dans un contrôleur, il faut trouver un moyen...
+6. **Vérifier les deux protections.** Répétez les étapes 1 et 2. Quel code HTTP obtenez-vous une fois la limite dépassée ? Une utilisation normale (quelques requêtes) fonctionne-t-elle toujours ?
 
 
 [⬆ Retour au sommaire](#sommaire)

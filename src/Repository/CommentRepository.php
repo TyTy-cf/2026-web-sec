@@ -16,6 +16,24 @@ class CommentRepository extends ServiceEntityRepository
         parent::__construct($registry, Comment::class);
     }
 
+    /**
+     * @return Comment[] Returns an array of Comment objects
+     */
+    public function LastByCreatedAt(?int $limit = null): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->join('c.topic', 't')
+            ->join('c.author', 'u')
+            ->select('c', 't', 'u')
+            ->orderBy('c.createdAt', 'DESC');
+
+        if ($limit !== null) {
+            $qb->setMaxResults($limit);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     //    /**
     //     * @return Comment[] Returns an array of Comment objects
     //     */

@@ -1,0 +1,42 @@
+{% extends 'back/base.html.twig' %}
+
+{% block title %}{{ 'admin.dashboard.title'|trans }}{% endblock %}
+
+{% block body %}
+    <h1 class="mb-4">{{ 'admin.dashboard.heading'|trans }}</h1>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <h2 class="h4">{{ 'admin.dashboard.latest_topics'|trans }}</h2>
+            <ul class="list-group">
+                {% for topic in latest_topics %}
+                    <li class="list-group-item">
+                        <a href="{{ path('app_topic_show', { id: topic.id }) }}">{{ topic.title }}</a>
+                        <div class="text-muted small">
+                            {{ 'common.posted_by'|trans({'%author%': topic.author.nickname, '%date%': topic.createdAt|date('d/m/Y H:i')}) }}
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="list-group-item">{{ 'admin.dashboard.no_topics'|trans }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <h2 class="h4">{{ 'admin.dashboard.latest_comments'|trans }}</h2>
+            <ul class="list-group">
+                {% for comment in latest_comments %}
+                    <li class="list-group-item">
+                        <p class="mb-1">{{ comment.content|slice(0, 120) }}{% if comment.content|length > 120 %}&hellip;{% endif %}</p>
+                        <div class="text-muted small">
+                            {{ 'common.posted_by'|trans({'%author%': comment.author.nickname, '%date%': comment.createdAt|date('d/m/Y H:i')}) }}
+                            &middot; <a href="{{ path('app_topic_show', { id: comment.topic.id }) }}">{{ comment.topic.title }}</a>
+                        </div>
+                    </li>
+                {% else %}
+                    <li class="list-group-item">{{ 'admin.dashboard.no_comments'|trans }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

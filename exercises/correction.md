@@ -12,6 +12,7 @@
 - [Exercice 7 — Cross-Site Request Forgery (CSRF)](#exercice-7)
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
+- [Exercice 10 — Rate Limiter](#exercice-10)
 
 ---
 
@@ -63,7 +64,7 @@ Une configuration explicite équivalente (`cookie_secure: auto` (ou `true`), `co
 <a id="exercice-2"></a>
 ## Exercice 2 — Persistent XSS
 
-**Code à recevoir** : un commentaire contenant un `<script>`, puis une version qui exécute une action (ex. `fetch()` qui soumet un commentaire au nom de la victime).
+**Livrable attendu** : le correctif de `templates/front/topic/show.html.twig` sur la branche du stagiaire (question 4), et la réponse à la question 5 (type de XSS) dans `exercises/reponses.md`. Les questions 1 à 3 sont de la démonstration (un commentaire contenant un `<script>`, puis une version qui exécute une action réelle, ex. `fetch()` qui soumet un commentaire au nom de la victime) — rien à en attendre dans `reponses.md`, à vérifier en live/à l'oral.
 
    ```html
    <script>
@@ -95,6 +96,44 @@ On récupère le jeton CSRF directement depuis la page sur laquelle elle s'exéc
 ```
 Laisser l'autoescape Twig faire son travail (retirer `|raw`).
 
+**Et si on a vraiment besoin de `|raw` ?** (à mentionner en discussion, ne fait pas partie du correctif attendu du stagiaire ici — Reddit-Ish n'a pas d'éditeur riche sur les commentaires). Un cas légitime existe bel et bien : un champ alimenté par un éditeur WYSIWYG (CKEditor, TipTap, etc.) produit du vrai HTML (`<b>`, `<a href>`, `<ul>`...) qu'on veut afficher tel quel — retirer `|raw` casserait l'affichage.
+
+La bonne réponse est un **sanitizer HTML en liste blanche** : un parseur qui ne conserve que les balises/attributs explicitement autorisés et supprime tout le reste, y compris `<script>`, les attributs `on*=`, ou les liens `javascript:`.
+
+Avec le composant natif `symfony/html-sanitizer` :
+```bash
+composer require symfony/html-sanitizer
+```
+```yaml
+# config/packages/html_sanitizer.yaml
+framework:
+    html_sanitizer:
+        enabled: true
+        sanitizers:
+            comment_sanitizer:
+                allow_safe_elements: true
+                allow_elements:
+                    a: ['href']
+                allowed_link_schemes: ['https', 'mailto']
+```
+```php
+// dans le contrôleur, au moment de la soumission — pas au moment de l'affichage
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerInterface;
+
+public function addComment(
+    Request $request,
+    Topic $topic,
+    EntityManagerInterface $entityManager,
+    #[Autowire(service: 'html_sanitizer.sanitizer.comment_sanitizer')] HtmlSanitizerInterface $commentSanitizer,
+): Response {
+    // ...
+    $comment->setContent($commentSanitizer->sanitize($form->get('content')->getData()));
+    // ...
+}
+```
+Le sanitizer nettoie le HTML **avant qu'il n'atteigne la base de données**, pas au moment de l'affichage : `<script>`, les gestionnaires d'évènements, les liens `javascript:`, etc. sont retirés, tandis que `<b>`, `<i>`, `<a href="https://...">` etc. survivent. Le template peut alors garder `{{ comment.content|raw }}` en toute sécurité, puisque ce qui est stocké n'est plus jamais dangereux — ce qui protège aussi les autres consommateurs du même contenu (par exemple `GET /api/topic`, qui n'a aucun autoescape Twig et exposerait le HTML stocké tel quel dans le JSON).
+
 [⬆ Retour au sommaire](#sommaire)
 
 ---
@@ -102,7 +141,7 @@ Laisser l'autoescape Twig faire son travail (retirer `|raw`).
 <a id="exercice-3"></a>
 ## Exercice 3 — Reflected XSS
 
-**Code à recevoir** : une URL du type `?q=x onfocus=alert(1) autofocus=x` (ou équivalent), avec la popup qui se déclenche sans clic.
+**Livrable attendu** : le correctif de `templates/front/common/_header.html.twig` sur la branche du stagiaire (question 8), et la réponse à la question 9 (type de faille XSS) dans `exercises/reponses.md`. Les questions 1 à 7 sont de la démonstration (URL du type `?q=x onfocus=alert(1) autofocus=x` ou équivalent, popup qui se déclenche sans clic) — rien à en attendre dans `reponses.md`, à vérifier en live/à l'oral.
 
 **Fix** — `templates/front/common/_header.html.twig`, attribut `value` du champ de recherche :
 ```diff
@@ -118,7 +157,7 @@ Il suffit d'ajouter les guillemets autour de la valeur ; l'autoescape Twig fait 
 <a id="exercice-4"></a>
 ## Exercice 4 — DOM-based XSS
 
-**Code à recevoir** : une URL du type `/categorie/1#ref=<img src=x onerror=alert(document.domain)>` (ou tout autre gadget HTML avec handler d'évènement — `<script>` ne fonctionne pas via `innerHTML`, c'est un point de vérification attendu).
+**Livrable attendu** : le correctif de `assets/scripts/app.ts` sur la branche du stagiaire (question 9), et la réponse à la question 10 (ce correctif peut-il être fait côté serveur ?) dans `exercises/reponses.md`. Les questions 1 à 8 sont de la démonstration (URL du type `/categorie/1#ref=<img src=x onerror=alert(document.domain)>` ou tout autre gadget HTML avec handler d'évènement — `<script>` ne fonctionne pas via `innerHTML`, c'est un point de vérification attendu) — rien à en attendre dans `reponses.md`, à vérifier en live/à l'oral.
 
 **Fix** — `assets/scripts/app.ts` :
 ```diff
@@ -141,7 +180,7 @@ Point à vérifier avec le stagiaire : le correctif est **uniquement côté clie
 <a id="exercice-5"></a>
 ## Exercice 5 — Broken Access Control
 
-**Code à recevoir** : pas de payload, juste la démonstration (URL de `/sujets/{id}/modifier` avec l'ID d'un sujet dont il n'est pas l'auteur, formulaire soumis avec succès).
+**Livrable attendu** : le correctif (Voter + contrôleur) sur la branche du stagiaire (question 6). Pas de question conceptuelle isolée dans cet exercice : rien à attendre dans `exercises/reponses.md` au-delà de la démonstration orale des questions 1 à 5 (URL de `/sujets/{id}/modifier` avec l'ID d'un sujet dont le stagiaire n'est pas l'auteur, formulaire soumis avec succès).
 
 **Fix attendu : un Voter**, pas un simple `if` dans le contrôleur.
 
@@ -201,7 +240,7 @@ class TopicVoter extends Voter
 <a id="exercice-6"></a>
 ## Exercice 6 — Content Security Policy
 
-**Code à recevoir** : pas de payload. Le livrable est une politique CSP fonctionnelle (preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 2, 3 et 4 sont neutralisés sans avoir touché au code vulnérable.
+**Livrable attendu** : la politique CSP elle-même sur la branche du stagiaire (question 3 — c'est le vrai livrable de cet exercice, preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 2, 3 et 4 sont neutralisés (question 4) et qu'une régression a été trouvée et corrigée (question 5), sans avoir touché au code vulnérable. La réponse à la question 7 (la CSP remplace-t-elle ou complète-t-elle les correctifs précédents ?) va dans `exercises/reponses.md`.
 
 **Point de départ attendu** : le stagiaire doit remarquer que `security.yaml` ne gère que l'authentification/autorisation (firewalls, providers, access_control), et chercher ailleurs. Deux réponses valables, au choix :
 
@@ -246,7 +285,7 @@ Une troisième réponse (un `EventSubscriber` sur `kernel.response` qui ajoute l
 <a id="exercice-7"></a>
 ## Exercice 7 — Cross-Site Request Forgery (CSRF)
 
-**Code à recevoir** : une page HTML piège (peut être un simple fichier ouvert en local, pas besoin de l'héberger) qui déclenche la suppression du commentaire ciblé dès son chargement, par exemple une balise `<img src="https://localhost:8443/commentaires/{id}/supprimer">` ou un formulaire caché qui s'auto-soumet en `GET` vers cette URL. Le commentaire doit disparaître alors que le stagiaire n'a jamais cliqué sur le bouton **Supprimer** de l'interface, tant qu'il est connecté à Reddit-Ish dans le même navigateur. Vérifier aussi qu'il confirme l'absence d'effet une fois déconnecté.
+**Livrable attendu** : le correctif de `CommentController::delete()` + `show.html.twig` sur la branche du stagiaire (question 8), et la réponse à la question 10 (catégorisation OWASP) dans `exercises/reponses.md`. Les questions 1 à 7 et 9 sont de la démonstration — Envoyer un lien vers une page HTML piège (peut être un simple fichier ouvert en local, pas besoin de l'héberger) qui déclenche la suppression du commentaire ciblé dès son chargement, par exemple une balise `<img src="https://localhost:8443/commentaires/{id}/supprimer">` ou un formulaire caché qui s'auto-soumet en `GET` vers cette URL, le commentaire doit disparaître alors que le stagiaire n'a jamais cliqué sur le bouton **Supprimer** de l'interface, tant qu'il est connecté à Reddit-Ish dans le même navigateur (vérifier aussi qu'il confirme l'absence d'effet une fois déconnecté), puis la même page piège rejouée après correctif (question 9) — rien à en attendre dans `reponses.md` au-delà de la question 10.
 
 **Pourquoi la protection habituelle de Symfony n'a pas suffi ici** : le formulaire de publication de commentaire passe par un `FormType`, qui embarque et vérifie un jeton CSRF automatiquement à chaque soumission. La route de suppression, elle, a été écrite à la main (un simple `<a href>` déclenchant un `GET`, sans passer par un objet `Form`) : rien ne la protège par défaut, il faut relire et vérifier le jeton manuellement.
 
@@ -318,7 +357,7 @@ Point à faire ressortir : le token est lié à une action *et* à une ressource
 <a id="exercice-8"></a>
 ## Exercice 8 — Integrity of JWT
 
-**Code à recevoir** : pas de code côté "attaque" — le payload décodé du jeton (copier/coller depuis jwt.io ou la console), la démonstration qu'un jeton altéré est rejeté, et une explication écrite qui distingue clairement intégrité et confidentialité. Côté "correctif", du vrai code cette fois (listener + config), détaillé étape par étape plus bas.
+**Livrable attendu** : le correctif (listener + provider) sur la branche du stagiaire (question 6), et les réponses aux questions 7 (le rôle doit-il apparaître dans le jeton ?) et 8 (quelle propriété a été corrigée) dans `exercises/reponses.md`. Les questions 1 à 5 sont de l'analyse/démonstration — le payload décodé du jeton (copier/coller depuis jwt.io ou la console), la démonstration qu'un jeton altéré est rejeté, et la comparaison avec `PHPSESSID` — rien à en attendre dans `reponses.md` au-delà de ça, à vérifier en live/à l'oral. Le correctif lui-même (listener + config) est détaillé étape par étape plus bas.
 
 **État vulnérable** (déjà en place) — payload actuel, exemple réel obtenu via `POST /api/login_check` :
 ```json
@@ -431,10 +470,10 @@ class JWTCreatedListener
 ```
 Appeler `GET /api/user/me` avec ce nouveau jeton : toujours `200 OK`, réponse inchangée. La fonctionnalité est intacte, seul le contenu exposé a changé.
 
-**Réponses attendues aux questions du `Correctif`** :
-- **Quel identifiant proposer** : l'`id` numérique interne (ou un UUID si on veut en plus éviter l'énumération séquentielle d'utilisateurs via un JWT volé — à valoriser si le stagiaire y pense, pas à exiger)
-- **Le rôle doit-il apparaître dans le jeton ?** Non : `JWTAuthenticator::loadUser()` recharge l'utilisateur (et donc ses rôles à jour) depuis la base à chaque requête via le provider — le claim `roles` n'est jamais consulté pour l'autorisation. L'y laisser n'apporterait rien et exposerait une information par principe de minimisation
-- **Quelle propriété a réellement été corrigée ?** La **confidentialité** des données exposées par le jeton (minimisation de ce qui est lisible par un tiers qui l'intercepte) — pas son intégrité, qui était déjà garantie par la signature RS256 avant même de commencer l'exercice
+**Réponses attendues aux questions 6 à 8** :
+- **Quel identifiant proposer (question 6)** : l'`id` numérique interne (ou un UUID si on veut en plus éviter l'énumération séquentielle d'utilisateurs via un JWT volé — à valoriser si le stagiaire y pense, pas à exiger)
+- **Le rôle doit-il apparaître dans le jeton ? (question 7)** Non : `JWTAuthenticator::loadUser()` recharge l'utilisateur (et donc ses rôles à jour) depuis la base à chaque requête via le provider — le claim `roles` n'est jamais consulté pour l'autorisation. L'y laisser n'apporterait rien et exposerait une information par principe de minimisation
+- **Quelle propriété a réellement été corrigée ? (question 8)** La **confidentialité** des données exposées par le jeton (minimisation de ce qui est lisible par un tiers qui l'intercepte) — pas son intégrité, qui était déjà garantie par la signature RS256 avant même de commencer l'exercice
 
 [⬆ Retour au sommaire](#sommaire)
 
@@ -443,7 +482,7 @@ Appeler `GET /api/user/me` avec ce nouveau jeton : toujours `200 OK`, réponse i
 <a id="exercice-9"></a>
 ## Exercice 9 — Login Throttling
 
-**Code à recevoir** : pas de payload d'attaque — la démonstration qu'un brute-force n'est pas limité avant correctif, puis la configuration `security.yaml` + `composer.json` mis à jour, puis la démonstration que le blocage fonctionne sur les deux routes.
+**Livrable attendu** : le correctif (`login_throttling` + `composer.json`) sur la branche du stagiaire (question 6), et les réponses aux questions 11 (configuration utilisée), 12 (protection contre un attaquant multi-IP) et 13 (catégorisation OWASP) dans `exercises/reponses.md`. Les questions 1 à 5 et 7 à 10 sont de la démonstration/lecture de code (absence de blocage avant correctif, blocage effectif après, lecture du code source des limiteurs) — rien à en attendre dans `reponses.md` au-delà de ça, à vérifier en live/à l'oral. La question 9 (lecture du code source) est la plus importante pédagogiquement : à valider à l'oral avant de donner le fix.
 
 **État vulnérable** : il n'y a rien à "casser" pour cet exercice, contrairement à la majorité des précédents. Symfony n'active `login_throttling` sur aucun firewall à moins qu'on le configure explicitement — c'est l'état par défaut du framework, jamais modifié dans ce projet. Comme pour la CSP (exercice 6), c'est une mesure de durcissement absente, pas une régression introduite. Le composer `symfony/rate-limiter` n'est **pas installé** (vérifiable : `composer show symfony/rate-limiter` ne renvoie rien) — c'est volontaire, le stagiaire devra l'installer lui-même en suivant l'erreur explicite que Symfony renvoie s'il configure `login_throttling` sans ce paquet (`vendor/symfony/security-bundle/.../LoginThrottlingFactory.php` lève : *"Login throttling requires the Rate Limiter component. Try running 'composer require symfony/rate-limiter'."*).
 
@@ -535,9 +574,121 @@ Avec ces valeurs : 5 échecs autorisés par compte+IP sur 15 minutes (limiteur l
 
 **3. Vérifier.** Après 5 tentatives échouées sur `/connexion` avec le même compte : la page de login réaffiche un message du type *"Too many failed login attempts, please try again in 15 minute(s)."* (traduction Symfony du domaine `security`, à adapter en français dans `translations/security.fr.yaml` si on veut rester cohérent avec la convention "tout en français côté utilisateur" du projet — à valoriser si le stagiaire y pense, sans l'exiger). Sur `POST /api/login_check`, un `429 Too Many Requests` (ou `401` selon la version exacte du `failure_handler` JWT en place) avec un message équivalent en JSON.
 
-**Réponses attendues aux questions du `Correctif`** :
-- **Configuration utilisée** : `login_throttling` sur les firewalls `main` et `api_login`, avec `max_attempts`/`interval` au choix du stagiaire (5 tentatives / 15 minutes est un choix raisonnable, ni trop laxiste ni trop agressif pour un site grand public)
-- **Protège-t-il contre un attaquant distribué sur beaucoup d'IP différentes ?** Non. Les deux limiteurs (local et global) sont, l'un comme l'autre, ancrés sur l'IP de la requête. Un attaquant qui dispose d'un botnet ou d'un pool de proxys peut répartir ses tentatives sur suffisamment d'IP différentes pour qu'aucune ne dépasse jamais le seuil (local ou global) individuellement, alors que le volume total sur le compte visé reste énorme — c'est exactement le scénario de *credential stuffing distribué* / *password spraying* à grande échelle. `login_throttling` reste une protection nécessaire (elle stoppe l'attaquant "naïf", depuis une seule machine) mais pas suffisante seule ; des mesures complémentaires existent (CAPTCHA après quelques échecs, MFA, détection d'anomalie de vélocité/géolocalisation au niveau WAF ou reverse proxy, listes de réputation d'IP), hors périmètre de cet exercice
-- **Catégorie OWASP** : **A07:2021 – Identification and Authentication Failures** (anciennement A2:2017). À distinguer de l'exercice 1 (**A05:2021 – Security Misconfiguration**) : là, une protection existait par défaut et avait été désactivée ; ici, aucune protection native n'existe tant qu'on ne l'active pas explicitement — ce n'est pas une mauvaise configuration, c'est une mesure de durcissement manquante, comme la CSP de l'exercice 6
+**Réponses attendues aux questions 11 à 13** :
+- **Configuration utilisée (question 11)** : `login_throttling` sur les firewalls `main` et `api_login`, avec `max_attempts`/`interval` au choix du stagiaire (5 tentatives / 15 minutes est un choix raisonnable, ni trop laxiste ni trop agressif pour un site grand public)
+- **Protège-t-il contre un attaquant distribué sur beaucoup d'IP différentes ? (question 12)** Non. Les deux limiteurs (local et global) sont, l'un comme l'autre, ancrés sur l'IP de la requête. Un attaquant qui dispose d'un botnet ou d'un pool de proxys peut répartir ses tentatives sur suffisamment d'IP différentes pour qu'aucune ne dépasse jamais le seuil (local ou global) individuellement, alors que le volume total sur le compte visé reste énorme — c'est exactement le scénario de *credential stuffing distribué* / *password spraying* à grande échelle. `login_throttling` reste une protection nécessaire (elle stoppe l'attaquant "naïf", depuis une seule machine) mais pas suffisante seule ; des mesures complémentaires existent (CAPTCHA après quelques échecs, MFA, détection d'anomalie de vélocité/géolocalisation au niveau WAF ou reverse proxy, listes de réputation d'IP), hors périmètre de cet exercice
+- **Catégorie OWASP (question 13)** : **A07:2021 – Identification and Authentication Failures** (anciennement A2:2017). À distinguer de l'exercice 1 (**A05:2021 – Security Misconfiguration**) : là, une protection existait par défaut et avait été désactivée ; ici, aucune protection native n'existe tant qu'on ne l'active pas explicitement — ce n'est pas une mauvaise configuration, c'est une mesure de durcissement manquante, comme la CSP de l'exercice 6
+
+[⬆ Retour au sommaire](#sommaire)
+
+---
+
+<a id="exercice-10"></a>
+## Exercice 10 — Rate Limiter
+
+**Livrable attendu** : uniquement du code sur la branche du stagiaire (questions 4 et 5) — pas de question conceptuelle dans cet exercice, rien à attendre dans `exercises/reponses.md`.
+
+**État vulnérable** : un formulaire d'inscription public (`/inscription`) a été ajouté pour cet exercice — voir plus bas la note sur pourquoi il existe. Ni lui, ni `GET /api/topic` (déjà public depuis l'exercice 8) n'ont de limite de requêtes. C'est, comme pour la CSP et le Login Throttling, une mesure de durcissement absente plutôt qu'une régression : rien à "casser", `symfony/rate-limiter` n'est pas installé par défaut.
+
+**Pourquoi deux cibles, et pourquoi `/inscription` a été créé pour l'occasion** : `login_throttling` (exercice 9) est une intégration Symfony toute faite, spécifique aux routes d'authentification d'un firewall. Ici, on veut que le stagiaire manipule directement le composant générique `symfony/rate-limiter`, dans ses deux usages réels :
+- **protéger une action précise** d'une application classique (un formulaire) — c'est le cas d'usage le plus courant du composant, et celui documenté en premier dans la doc Symfony
+- **protéger une route ou une famille de routes** d'une API — un cas où on ne veut pas injecter le limiteur dans chaque contrôleur un par un
+
+Avant cet exercice, la seule route avec un formulaire public était `/connexion`, déjà mobilisée par l'exercice 9 : réutiliser la même route aurait mélangé les deux mécanismes. `/inscription` (email, pseudo, mot de passe + confirmation, `src/Controller/SecurityController::register()`) a donc été ajouté comme pur point d'ancrage pour cet exercice, sans aucune protection au départ.
+
+**Note pour le formateur, à ne pas dévoiler au stagiaire ici** : `/inscription` réutilise le comportement par défaut de Symfony pour l'unicité d'email (`#[UniqueEntity]`), qui révèle explicitement si un email est déjà enregistré via un message d'erreur dédié sur le champ. C'est le point de départ prévu pour un exercice 11 séparé (énumération de comptes, cf. `CLAUDE.md` §3.3) — ne pas le corriger ni le mentionner dans le cadre de celui-ci.
+
+---
+
+### Fix — `/inscription` : limiteur injecté dans le contrôleur
+
+**1. Installer le composant**, si ce n'est pas déjà fait à l'exercice 9 :
+```bash
+composer require symfony/rate-limiter
+```
+
+**2. `config/packages/rate_limiter.yaml`** (nouveau fichier, ou ajouté à `framework.yaml`) :
+```yaml
+framework:
+    rate_limiter:
+        registration:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        public_api:
+            policy: sliding_window
+            limit: 60
+            interval: '1 minute'
+```
+Nommer un limiteur `registration` (ou `public_api`) enregistre automatiquement un alias d'autowiring : `RateLimiterFactoryInterface $registrationLimiter` (respectivement `$publicApiLimiter`) — le nom du paramètre est dérivé du nom du limiteur, suffixé de `Limiter`.
+
+**3. `src/Controller/SecurityController.php`**, méthode `register()` :
+```diff
++use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
++use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+
+ #[Route(path: '/inscription', name: 'app_register')]
+ public function register(
+     Request $request,
+     EntityManagerInterface $entityManager,
+     UserPasswordHasherInterface $passwordHasher,
++    RateLimiterFactoryInterface $registrationLimiter,
+ ): Response {
++    if ($request->isMethod('POST') && !$registrationLimiter->create($request->getClientIp())->consume(1)->isAccepted()) {
++        throw new TooManyRequestsHttpException();
++    }
++
+     $user = new User();
+     $form = $this->createForm(RegistrationType::class, $user);
+```
+`consume(1)` sur `POST` (la soumission réelle) suffit : inutile de consommer un jeton sur le simple `GET` d'affichage du formulaire, qui n'a pas d'effet de bord. Si le stagiaire consomme sur chaque requête (GET compris), ce n'est pas faux, juste plus strict — à ne pas pénaliser.
+
+---
+
+### Fix — `GET /api/topic` : listener sur `kernel.request`
+
+Une route d'API ne peut pas recevoir un `RateLimiterFactory` injecté "à la main" à chaque contrôleur qu'on veut protéger sans dupliquer la logique partout ; on passe par un listener qui s'applique à toute une famille de routes.
+
+**1. Nouveau fichier `src/EventListener/ApiRateLimitListener.php`** :
+```php
+<?php
+
+namespace App\EventListener;
+
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+
+#[AsEventListener(event: 'kernel.request')]
+class ApiRateLimitListener
+{
+    public function __construct(private RateLimiterFactoryInterface $publicApiLimiter)
+    {
+    }
+
+    public function __invoke(RequestEvent $event): void
+    {
+        if (!$event->isMainRequest()) {
+            return;
+        }
+
+        $request = $event->getRequest();
+
+        if (!str_starts_with($request->getPathInfo(), '/api/topic')) {
+            return;
+        }
+
+        if (!$this->publicApiLimiter->create($request->getClientIp())->consume(1)->isAccepted()) {
+            throw new TooManyRequestsHttpException();
+        }
+    }
+}
+```
+Avec l'attribut `#[AsEventListener]`, aucun enregistrement manuel dans `services.yaml` n'est nécessaire (l'autoconfiguration de Symfony s'en charge).
+
+**2. Vérifier.** Après avoir dépassé la limite sur l'une ou l'autre route : `429 Too Many Requests`. Une utilisation normale (quelques requêtes espacées) continue de fonctionner sur les deux.
+
+**Point à faire remarquer au stagiaire** : ce sont deux implémentations différentes du même composant sous-jacent (`symfony/rate-limiter`), choisies selon la forme de ce qu'on protège — une action précise avec un contrôleur unique (`/inscription`) contre une famille de routes traversée par plusieurs contrôleurs potentiels (`/api/*`). Aucune des deux n'est "la bonne" dans l'absolu ; c'est la forme de la cible qui dicte laquelle utiliser.
 
 [⬆ Retour au sommaire](#sommaire)

@@ -1,0 +1,7 @@
+<ul class="nav flex-column">
+    <li class="nav-item">
+        <a class="nav-link {% if app.current_route == 'admin_dashboard' %}active fw-bold{% endif %}" href="{{ path('admin_dashboard') }}">
+            {{ 'admin.menu.dashboard'|trans }}
+        </a>
+    </li>
+</ul>

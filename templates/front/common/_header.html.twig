@@ -17,10 +17,18 @@
         <div class="navbar-nav me-2">
             {% if app.user %}
                 {{ 'common.logged_in_as'|trans }} <span class="text-muted mx-2">{{ app.user.nickname }}</span>
+                {% if is_granted('ROLE_ADMIN') %}
+                    <a href="{{ path('admin_dashboard') }}" class="me-2">
+                        {{ 'common.back_office'|trans }}
+                    </a>
+                {% endif %}
                 <a href="{{ path('app_logout') }}">
                     {{ 'common.logout'|trans }}
                 </a>
             {% else %}
+                <a href="{{ path('app_register') }}" class="me-2">
+                    {{ 'common.register'|trans }}
+                </a>
                 <a href="{{ path('app_login') }}">
                     {{ 'common.login'|trans }}
                 </a>
