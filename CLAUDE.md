@@ -2,13 +2,12 @@
 # Project context
 
 
-This project serves as a training exercise for a web security course.
+This project serves as a training exercise for a web security course, the trainees are Symfony developers, experienced from 11 years to 1, that want to learn more about security in their project, how it's work and best practices.
 
 It's contains bad practices on purpose, so the trainees will have to fixes them.
 
 The project is named "Reddit-Ish", based on "Reddit". A forum-like project, where user posts topic, post/edit comments, search for topic etc. 
 
-The trainees are Symfony developers, experienced from 11 years to 1, that want to learn more about security in their project, how it's work and best practices. 
 
 ## 1. Project stack
 
@@ -25,11 +24,11 @@ The app has docker, with a Makefile to help.
 
 
 There is five containers :
-- caddy-1 : local server
-- phpmyadmin : db access
-- node-1 : for node, npm commands
-- php-1 : for php, using symfony and php commands
-- mariadb-1 : db using mariadb
+- `caddy-1` : local server
+- `phpmyadmin` : db access
+- `node-1` : for node, npm commands
+- `php-1` : for php, using symfony and php commands
+- `mariadb-1` : db using mariadb
 
 
 ### 1.2. Code convention
@@ -109,7 +108,7 @@ Unlike the previous features, this one is a missing hardening measure rather tha
 
 - [x] No `Content-Security-Policy` header on purpose, and no code was written for this exercise
 
-Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.2, 2.4 and 2.5 without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
+Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.2, 2.3 and 2.4 (the three XSS flavours) without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
 
 
 ### 2.7 Cross-Site Request Forgery (CSRF)
@@ -124,6 +123,28 @@ The files impacted are `CommentController.php` (`delete` function) and `template
 Note: the route also has no login check and no ownership check at all — anyone who knows/guesses a comment ID can delete it, logged in or not. That's a separate Broken Access Control issue, deliberately left unfixed by this exercise (its fix only covers CSRF) and reserved for a later exercise, see §3.1.
 
 
+### 2.8 Integrity of JWT (Sensitive Data Exposure via JWT payload)
+
+
+The app exposes an API under `/api` (API Platform + LexikJWTAuthenticationBundle), with `POST /api/login_check`, `GET /api/topic` (public) and `GET /api/user/me` (authenticated). This one is also a missing-hardening-style exercise rather than an injected bug: nothing was written to make the JWT payload leak data on purpose, it's simply what the bundle does out of the box when left unconfigured.
+
+- [x] `User::getUserIdentifier()` (`src/Entity/User.php`) returns the email, and the `app_user_provider` in `security.yaml` is keyed on `property: email` — so LexikJWTAuthenticationBundle's default payload puts the user's email in clear in the `username` claim, plus their `roles`, with nothing else changed or added
+
+The files impacted are `config/packages/lexik_jwt_authentication.yaml`, `config/packages/security.yaml` and `src/Entity/User.php` (all at their default/unmodified state — no PHP written for this exercise beyond what API Platform + JWT scaffolding already needed). The fix (personalizing the JWT payload via `lexik_jwt_authentication.on_jwt_created` and a second `id`-keyed provider for the `api` firewall) is left entirely to the trainee.
+
+
+### 2.9 Login Throttling (Identification and Authentication Failures)
+
+
+Two authentication entry points exist: `/connexion` (`main` firewall, `form_login`) and `POST /api/login_check` (`api_login` firewall, `json_login`). Like §2.6 (CSP), this is a missing hardening measure, not a regression: Symfony never enables `login_throttling` unless a firewall explicitly configures it, so neither route has any brute-force protection.
+
+- [x] No `login_throttling` configured on any firewall in `security.yaml`, on purpose, and `symfony/rate-limiter` is deliberately not installed (`composer.json`/`composer.lock`) so trainees hit Symfony's own explicit error message (*"Login throttling requires the Rate Limiter component..."*) and have to add the dependency themselves
+
+The file impacted is `config/packages/security.yaml` only (unmodified, missing the `login_throttling` block on both `main` and `api_login`). No PHP/Twig code involved. The fix is expected to also touch `composer.json` (`composer require symfony/rate-limiter`).
+
+Note: a follow-up exercise using the generic `symfony/rate-limiter` component directly (for `GET /api/topic`, which isn't an authentication route and so isn't covered by `login_throttling` at all) is planned separately — see §3.2.
+
+
 ## 3. Reserved for later (not yet an exercise)
 
 
@@ -136,4 +157,12 @@ These exist in the app for live demos during class, but have no entry in `exerci
 `CommentController::delete` — even after the CSRF fix from exercise 2.7 (`POST` + token), the route still has **no login check and no ownership check at all**: any authenticated user can delete any comment by ID, not just their own. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button from exercise 2.5).
 
 Planned follow-up (not implemented, not scheduled yet): add an ownership/login check as its own exercise, once exercise 2.7 (CSRF) has been covered.
+
+
+### 3.2 Generic Rate Limiter — public API abuse (`GET /api/topic`)
+
+
+Follow-up to §2.9 (Login Throttling), deliberately split into its own exercise so trainees exercise the two different tools separately: `GET /api/topic` is a public, unauthenticated read endpoint, so `login_throttling` (which only hooks into firewall authentication attempts) does not and cannot apply to it. The goal there is generic abuse/DoS protection (all requests, not just failed logins), using the `symfony/rate-limiter` component directly via a custom listener (e.g. on `kernel.request`) keyed on client IP, returning `429` past the limit.
+
+Not implemented, not scheduled yet — write this one once §2.9 has been covered and the trainees have seen `symfony/rate-limiter` installed (it's a dependency of `login_throttling` too, so it may already be present in `composer.json` by the time this exercise starts, depending on class order).
 
