@@ -20,15 +20,16 @@
 ### Table `user`
 
 
-| Colonne    | Type              | Contrainte         | Description                                                                                  |
-|------------|-------------------|--------------------|----------------------------------------------------------------------------------------------|
-| `id`       | `INT`             | PK, AUTO_INCREMENT | Identifiant unique de l'utilisateur                                                          |
-| `email`    | `VARCHAR(180)`    | NOT NULL, UNIQUE   | Adresse e-mail de connexion, doit être unique                                                |
-| `roles`    | `LONGTEXT` (JSON) | NOT NULL           | Tableau JSON des rôles (ex: `["ROLE_USER"]`, `["ROLE_ADMIN"]`) — contrôle les droits d'accès |
-| `password` | `VARCHAR(255)`    | NOT NULL           | Mot de passe hashé (ne jamais stocker en clair)                                              |
-| `nickname` | `VARCHAR(164)`    | NOT NULL           | Pseudo affiché publiquement sur la plateforme                                                |
-| `picture`  | `VARCHAR(255)`    | NULL autorisé      | Chemin ou URL vers la photo de profil (optionnel)                                            |
-| `birth_at` | `DATETIME`        | NULL autorisé      | Date de naissance de l'utilisateur (optionnel)                                               |
+| Colonne          | Type              | Contrainte         | Description                                                                                  |
+|------------------|-------------------|--------------------|----------------------------------------------------------------------------------------------|
+| `id`             | `INT`             | PK, AUTO_INCREMENT | Identifiant unique de l'utilisateur                                                          |
+| `email`          | `VARCHAR(180)`    | NOT NULL, UNIQUE   | Adresse e-mail de connexion, doit être unique                                                |
+| `roles`          | `LONGTEXT` (JSON) | NOT NULL           | Tableau JSON des rôles (ex: `["ROLE_USER"]`, `["ROLE_ADMIN"]`) — contrôle les droits d'accès |
+| `password`       | `VARCHAR(255)`    | NOT NULL           | Mot de passe hashé (ne jamais stocker en clair)                                              |
+| `nickname`       | `VARCHAR(164)`    | NOT NULL           | Pseudo affiché publiquement sur la plateforme                                                |
+| `activationCode` | `VARCHAR(255)`    | NULL autorisé      | Code d'activation du compde de l'utilisateur                                                 |
+| `picture`        | `VARCHAR(255)`    | NULL autorisé      | Chemin ou URL vers la photo de profil (optionnel)                                            |
+| `birth_at`       | `DATETIME`        | NULL autorisé      | Date de naissance de l'utilisateur (optionnel)                                               |
 
 
 ### Table `category`
@@ -127,5 +128,7 @@ Une fois le projet cloné, `make init` devrait suffir pour lancer le projet.
 Vous pouvez accéder au PHPMyAdmin via l'URL : http://localhost:8080/index.php?route=/database/structure&db=fakeddit
 
 Le projet intègre directement un server Caddy, une fois le conteneur Docker lancé, vous pouvez accéder à l'application via l'URL : https://localhost:8443/
+
+Les e-mails envoyés par l'application (par exemple lors d'une inscription) sont interceptés par Mailpit, consultable via l'URL : http://localhost:8025/
 
 Les mots de passe de tous les utilisateurs sont : `123`

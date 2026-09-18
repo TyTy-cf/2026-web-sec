@@ -64,6 +64,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTime $birthAt = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $activationCode = null;
+
     /**
      * @var Collection<int, Topic>
      */
@@ -198,6 +201,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setBirthAt(?\DateTime $birthAt): static
     {
         $this->birthAt = $birthAt;
+
+        return $this;
+    }
+
+    public function getActivationCode(): ?string
+    {
+        return $this->activationCode;
+    }
+
+    public function setActivationCode(?string $activationCode): static
+    {
+        $this->activationCode = $activationCode;
 
         return $this;
     }

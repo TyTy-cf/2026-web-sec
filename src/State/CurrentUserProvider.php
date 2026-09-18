@@ -10,10 +10,10 @@ use Symfony\Bundle\SecurityBundle\Security;
 /**
  * @implements ProviderInterface<User>
  */
-final class CurrentUserProvider implements ProviderInterface
+final readonly class CurrentUserProvider implements ProviderInterface
 {
     public function __construct(
-        private readonly Security $security,
+        private Security $security,
     ) {
     }
 

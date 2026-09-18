@@ -13,6 +13,7 @@
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
 - [Exercice 10 — Rate Limiter](#exercice-10)
+- [Exercice 11 — Account Enumeration](#exercice-11)
 
 ---
 
@@ -596,7 +597,7 @@ Avec ces valeurs : 5 échecs autorisés par compte+IP sur 15 minutes (limiteur l
 
 Avant cet exercice, la seule route avec un formulaire public était `/connexion`, déjà mobilisée par l'exercice 9 : réutiliser la même route aurait mélangé les deux mécanismes. `/inscription` (email, pseudo, mot de passe + confirmation, `src/Controller/SecurityController::register()`) a donc été ajouté comme pur point d'ancrage pour cet exercice, sans aucune protection au départ.
 
-**Note pour le formateur, à ne pas dévoiler au stagiaire ici** : `/inscription` réutilise le comportement par défaut de Symfony pour l'unicité d'email (`#[UniqueEntity]`), qui révèle explicitement si un email est déjà enregistré via un message d'erreur dédié sur le champ. C'est le point de départ prévu pour un exercice 11 séparé (énumération de comptes, cf. `CLAUDE.md` §3.3) — ne pas le corriger ni le mentionner dans le cadre de celui-ci.
+**Note pour le formateur, à ne pas dévoiler au stagiaire ici** : `/inscription` réutilise le comportement par défaut de Symfony pour l'unicité d'email (`#[UniqueEntity]`), qui révèle explicitement si un email est déjà enregistré via un message d'erreur dédié sur le champ. C'est le point de départ de l'exercice 11 (énumération de comptes, cf. `CLAUDE.md` §2.11, plus bas dans ce document) — ne pas le corriger ni le mentionner dans le cadre de celui-ci.
 
 ---
 
@@ -690,5 +691,103 @@ Avec l'attribut `#[AsEventListener]`, aucun enregistrement manuel dans `services
 **2. Vérifier.** Après avoir dépassé la limite sur l'une ou l'autre route : `429 Too Many Requests`. Une utilisation normale (quelques requêtes espacées) continue de fonctionner sur les deux.
 
 **Point à faire remarquer au stagiaire** : ce sont deux implémentations différentes du même composant sous-jacent (`symfony/rate-limiter`), choisies selon la forme de ce qu'on protège — une action précise avec un contrôleur unique (`/inscription`) contre une famille de routes traversée par plusieurs contrôleurs potentiels (`/api/*`). Aucune des deux n'est "la bonne" dans l'absolu ; c'est la forme de la cible qui dicte laquelle utiliser.
+
+[⬆ Retour au sommaire](#sommaire)
+
+---
+
+<a id="exercice-11"></a>
+## Exercice 11 — Account Enumeration
+
+**Livrable attendu** : le correctif (`User.php` + `SecurityController::register()`) sur la branche du stagiaire (question 7), et la réponse à la question 9 (catégorisation OWASP + lien avec un exercice précédent) dans `exercises/reponses.md`. Les questions 1 à 6 et 8 sont de la démonstration/diagnostic (comparaison des deux réponses du formulaire, lecture de `User.php`) — rien à en attendre dans `reponses.md` au-delà de la question 9, à vérifier en live/à l'oral.
+
+**État vulnérable** (déjà en place, rien n'a été cassé exprès pour cet exercice) : `src/Entity/User.php` porte l'attribut `#[UniqueEntity(fields: ['email'], message: 'Cette adresse e-mail est déjà utilisée.')]`, comportement par défaut dès qu'on veut garantir l'unicité d'un champ avec le composant Validator de Symfony. `SecurityController::register()` (utilisé par §2.10) ne fait rien de spécial autour de ça — c'est le formulaire tel qu'il a été laissé après l'exercice 10.
+
+**Ce que ça produit concrètement** :
+- Inscription avec une adresse neuve → le compte est créé, flash `flash.account_created`, redirection vers `/connexion`
+- Inscription avec une adresse déjà utilisée (ex. `carter.davis1@example.com`) → le formulaire est réaffiché avec une erreur *spécifique au champ email* ("Cette adresse e-mail est déjà utilisée."), aucune redirection
+
+Les deux réponses sont trivialement distinguables (contenu de la page, présence/absence de redirection), y compris par un script automatisé qui n'a besoin de rien d'autre que le code HTTP et un `grep` sur le corps de la réponse. C'est un oracle d'énumération de comptes classique (CWE-203).
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1-2. Comparer les deux réponses.** Faire inscrire le stagiaire une première fois avec une adresse neuve (succès + redirection), puis une seconde fois avec une adresse déjà connue (formulaire réaffiché, erreur dédiée sur le champ email). Lui faire décrire lui-même, avec ses mots, ce qui diffère.
+
+**3-4. L'impact.** Faire formuler explicitement : n'importe qui, sans être connecté et sans connaître de mot de passe, peut soumettre une adresse e-mail à ce formulaire et savoir en une requête si elle correspond à un compte existant sur Reddit-Ish. À l'échelle (une liste de milliers d'adresses, par exemple issues d'une fuite tierce), ça permet de confirmer quelles personnes d'une liste ont un compte sur ce site précis — une information exploitable pour du phishing ciblé, ou pour croiser des identités avec d'autres fuites, même sans jamais obtenir un seul mot de passe.
+
+**5. Lien avec le rate limiter (§2.10).** Non, le rate limiter ne supprime pas l'oracle, il ne fait que ralentir sa exploitation. Un attaquant qui respecte la limite (par exemple 5 requêtes/15 minutes, cf. exercice 10) peut toujours énumérer la totalité d'une liste, juste plus lentement — exactement le même enseignement "défense en profondeur ≠ correctif" que la CSP de l'exercice 6.
+
+**6. L'origine technique.** L'attribut `#[UniqueEntity(fields: ['email'])]` sur `User` (`src/Entity/User.php`). Le Validator de Symfony exécute une requête de vérification d'unicité *avant* la soumission en base, et attache l'erreur au champ concerné si une correspondance existe déjà — c'est ce comportement, pas une erreur de code, qui produit la différence observée.
+
+---
+
+### Fix — réponse uniforme, unicité toujours garantie en base
+
+**Principe** : on ne peut pas simplement supprimer toute vérification d'unicité (la contrainte `UNIQUE` sur `user.email`, cf. le dictionnaire de données du `readme.md`, doit rester — on ne veut pas deux comptes avec le même email). Ce qu'il faut supprimer, c'est la fuite d'information *avant* la tentative d'écriture : on retire le contrôle de validation qui répond différemment selon le cas, et on laisse la contrainte `UNIQUE` de la base agir comme filet de sécurité, en interceptant l'exception qu'elle lève pour répondre exactement comme en cas de succès.
+
+**1. `src/Entity/User.php`** — retirer `#[UniqueEntity]` (la validation applicative qui fuite) :
+```diff
+-use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+ use Symfony\Component\Security\Core\User\UserInterface;
+ use Symfony\Component\Serializer\Attribute\Groups;
+
+ #[ORM\Entity(repositoryClass: UserRepository::class)]
+ #[ORM\Table(name: '`user`')]
+ #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+-#[UniqueEntity(fields: ['email'], message: 'Cette adresse e-mail est déjà utilisée.')]
+ #[ApiResource(
+```
+`#[ORM\UniqueConstraint]` (la contrainte SQL) reste intacte : c'est elle qui empêchera toujours une deuxième ligne avec le même email d'exister en base, elle n'a rien à voir avec le message d'erreur qui fuitait.
+
+**2. `src/Controller/SecurityController.php`**, méthode `register()` — intercepter la violation de contrainte et répondre comme en cas de succès :
+```diff
+ use App\Entity\User;
+ use App\Form\RegistrationType;
++use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+ use Doctrine\ORM\EntityManagerInterface;
+ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+ use Symfony\Component\HttpFoundation\Request;
+ use Symfony\Component\HttpFoundation\Response;
+ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+ use Symfony\Component\Routing\Attribute\Route;
+ use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
+ ...
+         if ($form->isSubmitted() && $form->isValid()) {
+             $user->setPassword($passwordHasher->hashPassword($user, $form->get('plainPassword')->getData()));
+             $user->setRoles([]);
+             $user->setCreatedAt(new \DateTime());
+
+-            $entityManager->persist($user);
+-            $entityManager->flush();
+-
+-            $this->addFlash('success', 'flash.account_created');
++            try {
++                $entityManager->persist($user);
++                $entityManager->flush();
++            } catch (UniqueConstraintViolationException) {
++                // the email is already registered: say nothing different than on
++                // success, so this endpoint can't be used to enumerate accounts
++                $entityManager->clear();
++            }
++
++            $this->addFlash('success', 'flash.account_created');
+
+             return $this->redirectToRoute('app_login');
+         }
+```
+`$entityManager->clear()` (plutôt qu'un simple `detach`) est nécessaire ici : après une `UniqueConstraintViolationException`, Doctrine considère l'EntityManager dans un état invalide (transaction annulée côté base) et refusera toute opération ultérieure tant qu'il n'a pas été réinitialisé — même si aucune autre opération n'est faite dans cette requête, c'est la façon correcte de fermer proprement l'incident.
+
+**3. Vérifier.** Répéter les étapes 1 et 2 du questionnaire stagiaire : dans les deux cas (email neuf ou déjà utilisé), la page renvoie désormais exactement la même chose — redirection vers `/connexion`, même flash `flash.account_created`, même code HTTP. Confirmer côté base qu'aucune ligne dupliquée n'a été créée (`SELECT COUNT(*) FROM user WHERE email = '...'` reste à 1).
+
+**Point à faire ressortir avec le stagiaire** : le message affiché ("Votre compte a été créé...") devient techniquement mensonger dans le cas où l'email existait déjà — c'est un compromis assumé et **le seul moyen réaliste d'obtenir une réponse identique** sans construire un vrai parcours de double opt-in par e-mail (hors périmètre ici, `symfony/mailer` n'est pas câblé à cet effet dans ce projet). C'est le même principe que "ne jamais confirmer ni infirmer" utilisé par les mécanismes de réinitialisation de mot de passe bien conçus ("si un compte existe pour cette adresse, vous recevrez un e-mail").
+
+**Aller plus loin (à mentionner, pas à exiger)** : un timing-oracle résiduel subsiste — la branche avec exception (`catch`) fait un aller-retour SQL en plus et peut être marginalement plus lente que la branche de succès directe, ce qui reste en théorie mesurable par un attaquant patient qui moyenne un grand nombre de requêtes. Corriger ça proprement demanderait de vérifier l'unicité de façon constante en temps (ex. toujours faire un `SELECT` avant, que l'email existe ou non) ; hors périmètre de cet exercice, mais une bonne piste de discussion si le sujet vient du stagiaire.
+
+**Réponse attendue à la question 9** :
+- **Catégorie OWASP** : **A07:2021 – Identification and Authentication Failures** — même catégorie que l'exercice 9 (Login Throttling), CWE-203 (Observable Discrepancy) plus précisément
+- **Lien avec un exercice précédent** : l'exercice 10 (Rate Limiter). Le rate limiter posé sur `/inscription` ralentit l'exploitation de cet oracle mais ne le supprime pas — un attaquant patient qui respecte la limite énumère quand même la totalité d'une liste d'adresses, juste plus lentement. C'est la même leçon "défense en profondeur ≠ correctif du bug" que l'exercice 6 (CSP), qui ne corrige aucune des trois XSS mais en limite l'impact
 
 [⬆ Retour au sommaire](#sommaire)

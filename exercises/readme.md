@@ -31,6 +31,7 @@
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
 - [Exercice 10 — Rate Limiter](#exercice-10)
+- [Exercice 11 — Account Enumeration](#exercice-11)
 
 
 <a id="exercice-1"></a>
@@ -333,6 +334,34 @@
 4. **Protéger `/inscription`.** Limitez le nombre de soumissions par adresse IP
 5. **Protéger `GET /api/topic`.** Cette fois, la protection doit s'appliquer à une route (ou une famille de routes), pas à une seule action précise dans un contrôleur, il faut trouver un moyen...
 6. **Vérifier les deux protections.** Répétez les étapes 1 et 2. Quel code HTTP obtenez-vous une fois la limite dépassée ? Une utilisation normale (quelques requêtes) fonctionne-t-elle toujours ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-11"></a>
+# Exercice 11 — Account Enumeration
+
+
+## Pour commencer
+
+
+- Un formulaire d'inscription existe sur `/inscription` (voir exercice 10)
+- Préparez deux adresses e-mail : une déjà utilisée par un compte prérempli (par exemple `carter.davis1@example.com`), et une dont vous êtes certain qu'elle n'a jamais servi sur ce site
+
+
+## Questions
+
+
+1. **Utiliser la fonctionnalité normalement.** Inscrivez-vous avec une adresse e-mail neuve, un pseudo et un mot de passe. Que se passe-t-il ?
+2. **Réessayer avec une adresse déjà utilisée.** Remplissez à nouveau le formulaire, cette fois avec l'adresse e-mail d'un compte prérempli existant. Que se passe-t-il ? Comparez précisément le message obtenu avec celui de l'étape 1 : que change-t-il, à l'écran comme dans le code source de la page ?
+3. **Comprendre ce que cette différence révèle.** Sans jamais vous connecter, rien qu'en observant la réponse du formulaire, comment pourriez-vous déterminer si une adresse e-mail donnée possède déjà un compte sur Reddit-Ish ?
+4. **Mesurer l'ampleur du problème.** Imaginez que vous disposiez d'une liste de plusieurs milliers d'adresses e-mail (par exemple issue d'une fuite de données d'un autre site). Qu'apprendriez-vous en les soumettant une par une à ce formulaire ? En quoi est-ce dangereux pour les personnes concernées, même sans jamais obtenir leur mot de passe ?
+5. **Faire le lien avec l'exercice précédent.** Le rate limiter mis en place à l'exercice 10 sur `/inscription` empêche-t-il ce scénario ? Justifiez votre réponse
+6. **Trouver l'origine technique.** Regardez `src/Entity/User.php` : quel attribut de validation Symfony est responsable du message différent obtenu à l'étape 2 ?
+7. **Mettre en place le correctif.** Modifiez le comportement du formulaire d'inscription pour qu'il réponde exactement de la même façon (message affiché, code HTTP, redirection), que l'adresse e-mail soit déjà utilisée ou non. Attention : la contrainte d'unicité sur `user.email` (voir le dictionnaire de données dans `readme.md`) doit être conservée en base — il ne s'agit pas de permettre la création de deux comptes avec le même e-mail
+8. **Revalider.** Répétez les étapes 1 et 2 une fois le correctif en place. Les deux réponses sont-elles désormais indiscernables l'une de l'autre ?
+9. **Qualifier la faille.** À quelle catégorie de l'OWASP Top 10 cette faille correspond-elle ? À quel autre exercice déjà réalisé peut-on la rattacher, et pour quelle raison ?
 
 
 [⬆ Retour au sommaire](#sommaire)

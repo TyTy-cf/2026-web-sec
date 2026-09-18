@@ -57,6 +57,12 @@ services:
     depends_on:
       - mariadb
 
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - 8025:8025
+      - 1025:1025
+
 volumes:
   mariadb:
   caddy_data:

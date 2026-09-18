@@ -46,7 +46,7 @@ There is five containers :
 Every "features" include a bad practices on purposes, which exists in OWASP, it also refers to an exercise, written in directory `exercises/readme.md`.
 Each time a "feature" is developed, an exercise has to be written, without giving too much information on what has to be fixed.
 You can look at the previous exercises for inspiration, all exercises have to be written in english.
-Update the `exercise/correction.md` for the expected fix for each exercise.
+When an exercise is added into `exercise/readme.md`, update the `exercise/correction.md` for the expected fix for each exercise, also the summary of each file.
 
 
 ### 2.1 Security Misconfiguration — Session cookie
@@ -156,7 +156,21 @@ Follow-up to §2.9 (Login Throttling), deliberately split into its own exercise 
 
 The fix is expected to be two different shapes: a `RateLimiterFactoryInterface` injected directly into `SecurityController::register()` for `/inscription` (per-action limiter), and a `kernel.request` event listener/subscriber for `/api/topic` (route-family limiter, since you can't sensibly inject a limiter into every controller that might sit under `/api`). Both were built and verified working during development (temporarily, then reverted) — the actual `config/packages/rate_limiter.yaml`, controller diff, and listener code are documented in full in `exercises/correction.md`.
 
-Note: `/inscription` itself relies on Symfony's default `#[UniqueEntity]` behavior for email uniqueness, which reveals via a distinct field-level error whether an email is already registered. That's deliberately left as-is — it's the target for a separate future exercise, see §3.2. Don't fix it as part of §2.10.
+Note: `/inscription` itself relies on Symfony's default `#[UniqueEntity]` behavior for email uniqueness, which reveals via a distinct field-level error whether an email is already registered. That's deliberately left as-is — it's the target for a separate exercise, see §2.11. Don't fix it as part of §2.10.
+
+
+### 2.11 Account/email enumeration on `/inscription` (Identification and Authentication Failures)
+
+
+Follow-up to §2.10 (Rate Limiter): the registration form added for that exercise uses Symfony's default `#[UniqueEntity(fields: ['email'])]` behavior on `User` (`src/Entity/User.php`), which produces a distinct, field-level validation error ("Cette adresse e-mail est déjà utilisée.") when the submitted email already belongs to an account. Submitting a known email (e.g. `carter.davis1@example.com`) vs. a random one gets a visibly different response — a textbook account-enumeration oracle (CWE-203, mapped under OWASP A07:2021).
+
+- [x] `#[UniqueEntity(fields: ['email'])]` left on `User` at its default/unmodified state, on purpose — nothing to break, it's simply what Symfony's validator does out of the box on a unique-email registration form
+
+The file impacted is `src/Entity/User.php` only (unmodified, `#[UniqueEntity]` attribute still present). No new PHP was written for this exercise beyond what §2.10 already needed for `/inscription` to exist.
+
+Deliberate pedagogical link to §2.10: rate-limiting `/inscription` (that exercise's fix) slows enumeration down but doesn't remove the oracle — a patient attacker respecting the limit still enumerates every account eventually. Same "defense in depth vs. actual fix" lesson already taught by the CSP exercise (§2.6), from a different angle. Also same OWASP category as §2.9 (Login Throttling), a second angle on A07:2021 worth calling out in the correction.
+
+The fix is expected to give a uniform response (message, HTTP code, redirect) regardless of whether the email exists, while still preventing a duplicate row at the database level (the `UNIQUE` constraint on `user.email` must stay). The actual controller/entity diff is documented in full in `exercises/correction.md`.
 
 
 ## 3. Reserved for later (not yet an exercise)
@@ -171,14 +185,4 @@ These exist in the app for live demos during class, but have no entry in `exerci
 `CommentController::delete` — even after the CSRF fix from exercise 2.7 (`POST` + token), the route still has **no login check and no ownership check at all**: any authenticated user can delete any comment by ID, not just their own. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button from exercise 2.5).
 
 Planned follow-up (not implemented, not scheduled yet): add an ownership/login check as its own exercise, once exercise 2.7 (CSRF) has been covered.
-
-
-### 3.2 Account/email enumeration on `/inscription` (Identification and Authentication Failures)
-
-
-Follow-up to §2.10 (Rate Limiter): the registration form added for that exercise uses Symfony's default `#[UniqueEntity(fields: ['email'])]` behavior on `User` (`src/Entity/User.php`), which produces a distinct, field-level validation error ("Cette adresse e-mail est déjà utilisée.") when the submitted email already belongs to an account. Submitting a known email (e.g. `carter.davis1@example.com`) vs. a random one gets a visibly different response — a textbook account-enumeration oracle (CWE-203, mapped under OWASP A07:2021).
-
-Deliberate pedagogical link to §2.10: rate-limiting `/inscription` (that exercise's fix) slows enumeration down but doesn't remove the oracle — a patient attacker respecting the limit still enumerates every account eventually. Same "defense in depth vs. actual fix" lesson already taught by the CSP exercise (§2.6), from a different angle. Also same OWASP category as §2.9 (Login Throttling), a second angle on A07:2021 worth calling out in the correction.
-
-Not implemented, not scheduled yet — write this one once §2.10 has been covered. The fix should give a uniform response regardless of whether the email exists (no code has been written for this exercise beyond what §2.10 already needed).
 

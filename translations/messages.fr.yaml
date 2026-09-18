@@ -67,7 +67,8 @@ flash:
     login_required: Vous devez être connecté !
     comment_posted: Votre commentaire a été publié.
     topic_updated: Le sujet a été mis à jour.
-    account_created: Votre compte a été créé, vous pouvez maintenant vous connecter.
+    account_created: Votre compte a été créé, afin de finaliser votre inscription, validez le mail que vous avez reçu !
+    account_activated: Votre compte a été activé, vous pouvez maintenant vous connecter.
 
 admin:
     brand: Administration
