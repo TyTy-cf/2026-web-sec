@@ -346,7 +346,7 @@
 ## Pour commencer
 
 
-- Un formulaire d'inscription existe sur `/inscription` (voir exercice 10)
+- Un formulaire d'inscription existe sur `/inscription` (voir exercice 10). Une inscription réussie envoie un e-mail de confirmation, consultable sur Mailpit : http://localhost:8025/
 - Préparez deux adresses e-mail : une déjà utilisée par un compte prérempli (par exemple `carter.davis1@example.com`), et une dont vous êtes certain qu'elle n'a jamais servi sur ce site
 
 
@@ -359,9 +359,9 @@
 4. **Mesurer l'ampleur du problème.** Imaginez que vous disposiez d'une liste de plusieurs milliers d'adresses e-mail (par exemple issue d'une fuite de données d'un autre site). Qu'apprendriez-vous en les soumettant une par une à ce formulaire ? En quoi est-ce dangereux pour les personnes concernées, même sans jamais obtenir leur mot de passe ?
 5. **Faire le lien avec l'exercice précédent.** Le rate limiter mis en place à l'exercice 10 sur `/inscription` empêche-t-il ce scénario ? Justifiez votre réponse
 6. **Trouver l'origine technique.** Regardez `src/Entity/User.php` : quel attribut de validation Symfony est responsable du message différent obtenu à l'étape 2 ?
-7. **Mettre en place le correctif.** Modifiez le comportement du formulaire d'inscription pour qu'il réponde exactement de la même façon (message affiché, code HTTP, redirection), que l'adresse e-mail soit déjà utilisée ou non. Attention : la contrainte d'unicité sur `user.email` (voir le dictionnaire de données dans `readme.md`) doit être conservée en base — il ne s'agit pas de permettre la création de deux comptes avec le même e-mail
-8. **Revalider.** Répétez les étapes 1 et 2 une fois le correctif en place. Les deux réponses sont-elles désormais indiscernables l'une de l'autre ?
-9. **Qualifier la faille.** À quelle catégorie de l'OWASP Top 10 cette faille correspond-elle ? À quel autre exercice déjà réalisé peut-on la rattacher, et pour quelle raison ?
+7. **Mettre en place le correctif.** Je vous laisse réfléchir à un correctif adéquat, une fois celui-ci validé avec moi, implémentez le. Attention : la contrainte d'unicité sur `user.email` doit être conservée en base — il ne s'agit pas de permettre la création de deux comptes avec le même e-mail
+8. **Revalider.** Répétez les étapes 1 et 2 une fois le correctif en place.
+9. **Qualifier la faille.** À quelle catégorie de l'OWASP Top 10 cette faille correspond-elle ?
 
 
 [⬆ Retour au sommaire](#sommaire)

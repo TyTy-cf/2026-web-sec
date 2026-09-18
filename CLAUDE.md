@@ -170,7 +170,7 @@ The file impacted is `src/Entity/User.php` only (unmodified, `#[UniqueEntity]` a
 
 Deliberate pedagogical link to §2.10: rate-limiting `/inscription` (that exercise's fix) slows enumeration down but doesn't remove the oracle — a patient attacker respecting the limit still enumerates every account eventually. Same "defense in depth vs. actual fix" lesson already taught by the CSP exercise (§2.6), from a different angle. Also same OWASP category as §2.9 (Login Throttling), a second angle on A07:2021 worth calling out in the correction.
 
-The fix is expected to give a uniform response (message, HTTP code, redirect) regardless of whether the email exists, while still preventing a duplicate row at the database level (the `UNIQUE` constraint on `user.email` must stay). The actual controller/entity diff is documented in full in `exercises/correction.md`.
+The fix is expected to stay minimal: drop `#[UniqueEntity]`, only create the account and send the confirmation email when the address is free, and show the same neutral message in both cases (the `UNIQUE` constraint on `user.email` stays as the database-level safety net). Trainees verify it through Mailpit: a confirmation email goes out for a fresh address, none for an already-registered one. The actual controller/entity diff is documented in full in `exercises/correction.md`.
 
 
 ## 3. Reserved for later (not yet an exercise)

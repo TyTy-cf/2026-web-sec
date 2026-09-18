@@ -725,14 +725,12 @@ Les deux réponses sont trivialement distinguables (contenu de la page, présenc
 
 ### Fix — réponse uniforme, unicité toujours garantie en base
 
-**Principe** : on ne peut pas simplement supprimer toute vérification d'unicité (la contrainte `UNIQUE` sur `user.email`, cf. le dictionnaire de données du `readme.md`, doit rester — on ne veut pas deux comptes avec le même email). Ce qu'il faut supprimer, c'est la fuite d'information *avant* la tentative d'écriture : on retire le contrôle de validation qui répond différemment selon le cas, et on laisse la contrainte `UNIQUE` de la base agir comme filet de sécurité, en interceptant l'exception qu'elle lève pour répondre exactement comme en cas de succès.
+**Principe** : la fuite ne vient pas de la contrainte d'unicité elle-même, mais du fait que le formulaire *répond différemment* selon que l'e-mail existe ou non. On retire donc la validation applicative qui produit ce message spécifique, et on fait en sorte que le contrôleur affiche toujours le même message neutre : si l'e-mail est libre, le compte est créé et l'e-mail de confirmation part ; s'il est déjà pris, on ne fait rien du tout — mais le visiteur voit exactement la même chose.
 
 **1. `src/Entity/User.php`** — retirer `#[UniqueEntity]` (la validation applicative qui fuite) :
 ```diff
 -use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
  use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
- use Symfony\Component\Security\Core\User\UserInterface;
- use Symfony\Component\Serializer\Attribute\Groups;
 
  #[ORM\Entity(repositoryClass: UserRepository::class)]
  #[ORM\Table(name: '`user`')]
@@ -740,51 +738,50 @@ Les deux réponses sont trivialement distinguables (contenu de la page, présenc
 -#[UniqueEntity(fields: ['email'], message: 'Cette adresse e-mail est déjà utilisée.')]
  #[ApiResource(
 ```
-`#[ORM\UniqueConstraint]` (la contrainte SQL) reste intacte : c'est elle qui empêchera toujours une deuxième ligne avec le même email d'exister en base, elle n'a rien à voir avec le message d'erreur qui fuitait.
+`#[ORM\UniqueConstraint]` (la contrainte SQL) reste intacte : c'est elle qui garantit toujours qu'aucune ligne dupliquée ne puisse exister en base.
 
-**2. `src/Controller/SecurityController.php`**, méthode `register()` — intercepter la violation de contrainte et répondre comme en cas de succès :
+**2. `src/Controller/SecurityController.php`**, méthode `register()` — ne créer le compte et n'envoyer l'e-mail que si l'adresse est libre, et afficher le même message dans tous les cas :
 ```diff
- use App\Entity\User;
- use App\Form\RegistrationType;
-+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
- use Doctrine\ORM\EntityManagerInterface;
- use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
- use Symfony\Component\HttpFoundation\Request;
- use Symfony\Component\HttpFoundation\Response;
- use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
- use Symfony\Component\Routing\Attribute\Route;
- use Symfony\Component\Security\Http\Authentication\AuthenticationUtils;
- ...
-         if ($form->isSubmitted() && $form->isValid()) {
-             $user->setPassword($passwordHasher->hashPassword($user, $form->get('plainPassword')->getData()));
-             $user->setRoles([]);
-             $user->setCreatedAt(new \DateTime());
-
--            $entityManager->persist($user);
--            $entityManager->flush();
+     if ($form->isSubmitted() && $form->isValid()) {
+-        $user->setPassword(...)
+-            ->setRoles([])
+-            ->setCreatedAt(new \DateTime())
+-            ->setActivationCode(uniqid());
 -
--            $this->addFlash('success', 'flash.account_created');
-+            try {
-+                $entityManager->persist($user);
-+                $entityManager->flush();
-+            } catch (UniqueConstraintViolationException) {
-+                // the email is already registered: say nothing different than on
-+                // success, so this endpoint can't be used to enumerate accounts
-+                $entityManager->clear();
-+            }
+-        $entityManager->persist($user);
+-        $entityManager->flush();
+-
+-        // ... génération de l'URL + envoi de l'e-mail ...
+-
+-        $this->addFlash('success', 'flash.account_created');
++        if (null === $userRepository->findOneBy(['email' => $user->getEmail()])) {
++            $user->setPassword(...)
++                ->setRoles([])
++                ->setCreatedAt(new \DateTime())
++                ->setActivationCode(uniqid());
 +
-+            $this->addFlash('success', 'flash.account_created');
++            $entityManager->persist($user);
++            $entityManager->flush();
++
++            // ... génération de l'URL + envoi de l'e-mail ...
++        }
++
++        $this->addFlash('success', 'flash.account_created');
 
-             return $this->redirectToRoute('app_login');
-         }
+         return $this->redirectToRoute('app_login');
+     }
 ```
-`$entityManager->clear()` (plutôt qu'un simple `detach`) est nécessaire ici : après une `UniqueConstraintViolationException`, Doctrine considère l'EntityManager dans un état invalide (transaction annulée côté base) et refusera toute opération ultérieure tant qu'il n'a pas été réinitialisé — même si aucune autre opération n'est faite dans cette requête, c'est la façon correcte de fermer proprement l'incident.
+(+ injecter `UserRepository $userRepository` dans la signature de `register()`)
 
-**3. Vérifier.** Répéter les étapes 1 et 2 du questionnaire stagiaire : dans les deux cas (email neuf ou déjà utilisé), la page renvoie désormais exactement la même chose — redirection vers `/connexion`, même flash `flash.account_created`, même code HTTP. Confirmer côté base qu'aucune ligne dupliquée n'a été créée (`SELECT COUNT(*) FROM user WHERE email = '...'` reste à 1).
+**3. `translations/messages.fr.yaml`** — le message ne doit plus affirmer que le compte a été créé, puisqu'il s'affiche aussi quand rien n'a été fait :
+```diff
+-    account_created: Votre compte a été créé, afin de finaliser votre inscription, validez le mail !
++    account_created: Si cette adresse e-mail est disponible, un message vous a été envoyé pour finaliser votre inscription.
+```
 
-**Point à faire ressortir avec le stagiaire** : le message affiché ("Votre compte a été créé...") devient techniquement mensonger dans le cas où l'email existait déjà — c'est un compromis assumé et **le seul moyen réaliste d'obtenir une réponse identique** sans construire un vrai parcours de double opt-in par e-mail (hors périmètre ici, `symfony/mailer` n'est pas câblé à cet effet dans ce projet). C'est le même principe que "ne jamais confirmer ni infirmer" utilisé par les mécanismes de réinitialisation de mot de passe bien conçus ("si un compte existe pour cette adresse, vous recevrez un e-mail").
+**4. Vérifier.** Rejouer les étapes 1 et 2 du questionnaire : dans les deux cas, même message, même redirection vers `/connexion`, même code HTTP. Puis ouvrir Mailpit (http://localhost:8025/) : un e-mail de confirmation est bien parti pour l'adresse neuve, et **aucun** pour l'adresse déjà utilisée. Côté base, `SELECT COUNT(*) FROM user WHERE email = '...'` reste à 1 pour l'adresse existante.
 
-**Aller plus loin (à mentionner, pas à exiger)** : un timing-oracle résiduel subsiste — la branche avec exception (`catch`) fait un aller-retour SQL en plus et peut être marginalement plus lente que la branche de succès directe, ce qui reste en théorie mesurable par un attaquant patient qui moyenne un grand nombre de requêtes. Corriger ça proprement demanderait de vérifier l'unicité de façon constante en temps (ex. toujours faire un `SELECT` avant, que l'email existe ou non) ; hors périmètre de cet exercice, mais une bonne piste de discussion si le sujet vient du stagiaire.
+**Point à faire ressortir avec le stagiaire** : c'est le principe du "ne jamais confirmer ni infirmer", le même que celui utilisé par les formulaires de réinitialisation de mot de passe bien conçus. L'information "ce compte existe" n'est plus donnée à l'écran ; elle n'est envoyée qu'au propriétaire réel de la boîte mail, qui lui sait déjà s'il a un compte.
 
 **Réponse attendue à la question 9** :
 - **Catégorie OWASP** : **A07:2021 – Identification and Authentication Failures** — même catégorie que l'exercice 9 (Login Throttling), CWE-203 (Observable Discrepancy) plus précisément
