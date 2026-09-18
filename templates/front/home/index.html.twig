@@ -3,7 +3,12 @@
 {% block title %}{{ 'home.title'|trans }}{% endblock %}
 
 {% block body %}
-    <h1 class="my-4">{{ 'home.latest_topics'|trans }}</h1>
+    <div class="d-flex align-items-center gap-3 my-4">
+        <h1 class="mb-0">{{ 'home.latest_topics'|trans }}</h1>
+        {% if app.user %}
+            <a href="{{ path('app_topic_new') }}" class="btn btn-success">{{ 'home.new_topic'|trans }}</a>
+        {% endif %}
+    </div>
 
     {% for topic in topics %}
         <div class="card mb-3 col-xl-6 col-md-8 col-12 mx-auto">

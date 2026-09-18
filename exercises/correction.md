@@ -8,12 +8,17 @@
 - [Exercice 3 — Reflected XSS](#exercice-3)
 - [Exercice 4 — DOM-based XSS](#exercice-4)
 - [Exercice 5 — Broken Access Control](#exercice-5)
-- [Exercice 6 — Content Security Policy](#exercice-6)
+- [Exercice 6 — En-têtes HTTP de sécurité](#exercice-6)
 - [Exercice 7 — Cross-Site Request Forgery (CSRF)](#exercice-7)
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
 - [Exercice 10 — Rate Limiter](#exercice-10)
 - [Exercice 11 — Account Enumeration](#exercice-11)
+- [Exercice 12.1 — Durcissement de `php.ini`](#exercice-12-1)
+- [Exercice 12.2 — Upload de fichier](#exercice-12-2)
+- [Exercice 12.3 — Images à URL prédictibles](#exercice-12-3)
+- [Exercice 13 — Audit des dépendances](#exercice-13)
+- [Exercice 14 — Politique de mot de passe](#exercice-14)
 
 ---
 
@@ -239,9 +244,9 @@ class TopicVoter extends Voter
 ---
 
 <a id="exercice-6"></a>
-## Exercice 6 — Content Security Policy
+## Exercice 6 — En-têtes HTTP de sécurité
 
-**Livrable attendu** : la politique CSP elle-même sur la branche du stagiaire (question 3 — c'est le vrai livrable de cet exercice, preuve : en-tête `Content-Security-Policy` visible dans les réponses HTTP), plus la démonstration que les payloads des exercices 2, 3 et 4 sont neutralisés (question 4) et qu'une régression a été trouvée et corrigée (question 5), sans avoir touché au code vulnérable. La réponse à la question 7 (la CSP remplace-t-elle ou complète-t-elle les correctifs précédents ?) va dans `exercises/reponses.md`.
+**Livrable attendu** : les trois en-têtes de sécurité sur la branche du stagiaire — la politique CSP (question 3), `Strict-Transport-Security` (question 8) et `X-Frame-Options` (question 9), preuve : les trois en-têtes visibles dans les réponses HTTP —, plus la démonstration que les payloads des exercices 2, 3 et 4 sont neutralisés (question 4) et qu'une régression a été trouvée et corrigée (question 5), sans avoir touché au code vulnérable. Vont dans `exercises/reponses.md` : la réponse à la question 7 (la CSP remplace-t-elle ou complète-t-elle les correctifs précédents ?), et les explications conceptuelles des questions 8 (ce que force HSTS, contre quoi, condition de prise en compte, piège du `max-age`) et 9 (l'attaque de clickjacking bloquée).
 
 **Point de départ attendu** : le stagiaire doit remarquer que `security.yaml` ne gère que l'authentification/autorisation (firewalls, providers, access_control), et chercher ailleurs. Deux réponses valables, au choix :
 
@@ -278,6 +283,40 @@ Une troisième réponse (un `EventSubscriber` sur `kernel.response` qui ajoute l
 - Sans `'unsafe-inline'` dans `script-src`, les balises `<script>` injectées (exercice 2) et les gestionnaires d'évènements inline (`onerror=`, `onfocus=`, exercices 3 et 4) sont bloqués par le navigateur, qui affiche une erreur *Refused to execute inline script/event handler because it violates the following Content Security Policy directive* dans la console — **sans que le code vulnérable n'ait changé**. C'est le point pédagogique central : la CSP est une mesure de défense en profondeur, pas un correctif
 - **Régression attendue** : l'input `#share-link` de `templates/front/category/show.html.twig` a un `onclick="this.select()"` inline, qui est lui aussi bloqué par une politique stricte. Le stagiaire doit le remarquer et le corriger en déplaçant la logique dans `assets/scripts/app.ts` (`document.getElementById('share-link')?.addEventListener('click', ...)`) plutôt qu'en ajoutant `'unsafe-inline'` (ce qui annulerait toute la protection obtenue à l'étape précédente)
 - Une politique qui autorise `'unsafe-inline'` "pour que ça marche plus simplement" doit être considérée comme un échec de l'exercice : ça ne bloque plus rien des exercices précédents
+
+---
+
+### Questions 8-9 — HSTS et X-Frame-Options
+
+Les deux en-têtes s'ajoutent au même endroit que la CSP (selon l'option choisie). En Caddy :
+```
+# Caddyfile — dans le bloc du site
+header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+header X-Frame-Options "DENY"
+```
+En NelmioSecurityBundle :
+```yaml
+nelmio_security:
+    forced_ssl:                     # émet l'en-tête HSTS
+        hsts_max_age: 31536000
+        hsts_subdomains: true
+    clickjacking:
+        paths:
+            '^/.*': DENY            # émet X-Frame-Options: DENY
+```
+
+**Question 8 — HSTS (`Strict-Transport-Security`)** :
+- Ce qu'il force : une fois l'en-tête reçu, le navigateur **refuse toute connexion en HTTP clair** vers ce domaine pendant `max-age` et passe automatiquement en HTTPS, sans même émettre la requête HTTP initiale
+- Contre quoi il protège : le **SSL stripping / downgrade** — un attaquant en position d'homme du milieu qui intercepte la première requête HTTP (avant redirection) pour la maintenir en clair. HSTS supprime cette fenêtre
+- Condition de prise en compte : l'en-tête n'est **honoré que s'il est reçu via une connexion HTTPS déjà valide** (un navigateur ignore un HSTS reçu en HTTP). Sur ce projet, tout passe déjà par `https://localhost:8443`, donc c'est le cas
+- Le piège du `max-age` long : la directive est **mémorisée par le navigateur** pour toute sa durée. Si on pose `max-age=31536000` (1 an) et qu'on doit ensuite repasser en HTTP (ou servir un sous-domaine sans TLS, avec `includeSubDomains`), les visiteurs restent bloqués côté navigateur, sans moyen d'action côté serveur. Bonne pratique : **commencer avec un `max-age` court** (quelques minutes/heures), vérifier que tout fonctionne, puis l'augmenter progressivement. À ne surtout pas confondre avec la liste `preload` (encore plus difficile à révoquer)
+
+**Question 9 — X-Frame-Options** :
+- Démonstration : une page externe avec `<iframe src="https://localhost:8443/"></iframe>` affiche aujourd'hui le site sans problème (aucun en-tête ne l'en empêche)
+- Après ajout de `X-Frame-Options: DENY` (ou `SAMEORIGIN`), le navigateur **refuse de rendre le site dans l'iframe** et affiche une erreur : l'iframe reste vide
+- L'attaque bloquée est le **clickjacking** : superposer le site (invisible/transparent) au-dessus d'un leurre pour piéger la victime en lui faisant cliquer, à son insu, sur une action réelle de l'application (dans laquelle elle est authentifiée)
+- Note : l'équivalent moderne est la directive CSP `frame-ancestors 'none'` (ou `'self'`), qui a l'avantage d'être plus fine et de remplacer `X-Frame-Options` sur les navigateurs récents. Un stagiaire qui la propose *en plus* ou *à la place* a raison — à valoriser
 
 [⬆ Retour au sommaire](#sommaire)
 
@@ -746,7 +785,7 @@ Les deux réponses sont trivialement distinguables (contenu de la page, présenc
 -        $user->setPassword(...)
 -            ->setRoles([])
 -            ->setCreatedAt(new \DateTime())
--            ->setActivationCode(uniqid());
+-            ->setActivationCode(bin2hex(random_bytes(16)));
 -
 -        $entityManager->persist($user);
 -        $entityManager->flush();
@@ -758,7 +797,7 @@ Les deux réponses sont trivialement distinguables (contenu de la page, présenc
 +            $user->setPassword(...)
 +                ->setRoles([])
 +                ->setCreatedAt(new \DateTime())
-+                ->setActivationCode(uniqid());
++                ->setActivationCode(bin2hex(random_bytes(16)));
 +
 +            $entityManager->persist($user);
 +            $entityManager->flush();
@@ -786,5 +825,391 @@ Les deux réponses sont trivialement distinguables (contenu de la page, présenc
 **Réponse attendue à la question 9** :
 - **Catégorie OWASP** : **A07:2021 – Identification and Authentication Failures** — même catégorie que l'exercice 9 (Login Throttling), CWE-203 (Observable Discrepancy) plus précisément
 - **Lien avec un exercice précédent** : l'exercice 10 (Rate Limiter). Le rate limiter posé sur `/inscription` ralentit l'exploitation de cet oracle mais ne le supprime pas — un attaquant patient qui respecte la limite énumère quand même la totalité d'une liste d'adresses, juste plus lentement. C'est la même leçon "défense en profondeur ≠ correctif du bug" que l'exercice 6 (CSP), qui ne corrige aucune des trois XSS mais en limite l'impact
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+---
+
+<a id="exercice-12-1"></a>
+## Exercice 12.1 — Durcissement de `php.ini`
+
+**Livrable attendu** : le correctif dans `docker/` sur la branche du stagiaire (question 6), et les réponses aux questions 2 (intérêt de la version pour un attaquant), 4 (pourquoi l'absence de trace est un problème distinct) et 8 (catégorisation OWASP) dans `exercises/reponses.md`. Les questions 1, 3, 5 et 7 sont de l'observation/diagnostic — à vérifier en live/à l'oral.
+
+**État vulnérable** (déjà en place, rien n'a été cassé exprès) : l'image PHP du projet part de `php:8.2-fpm` sans fichier `php.ini` fourni. Les seules directives définies dans `docker/Dockerfile` (lignes 14-16) sont `memory_limit`, `post_max_size` et `upload_max_filesize` — aucune directive de sécurité. Valeurs effectives relevées dans le conteneur :
+
+```
+expose_php               1       → en-tête "x-powered-by: PHP/8.2.33" sur chaque réponse
+display_errors           1
+log_errors               0       → erreurs affichées au visiteur, tracées nulle part
+allow_url_fopen          1
+allow_url_include        0       (déjà à la bonne valeur, valeur par défaut de PHP)
+session.use_strict_mode  0
+disable_functions        (vide)
+open_basedir             (vide)
+```
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1. Récupérer la version de PHP depuis l'extérieur.** Un simple `curl -I https://localhost:8443/` (ou l'onglet Réseau des DevTools) suffit : `expose_php = 1` fait ajouter par PHP l'en-tête `x-powered-by: PHP/8.2.33` sur **toutes** les réponses. Aucun accès au conteneur n'est nécessaire, aucune erreur à provoquer. C'est le point d'entrée de l'exercice, et il doit être trouvé en moins d'une minute.
+
+**2. L'intérêt pour un attaquant.** Connaître la version exacte permet de chercher directement les CVE correspondantes et de ne tenter que les exploits qui ont une chance de fonctionner, au lieu de tout essayer à l'aveugle (ce qui est bruyant et détectable). C'est de la reconnaissance : ça ne donne aucun accès en soi, mais ça transforme une attaque opportuniste en attaque ciblée. Même logique pour la bannière du serveur web, les en-têtes `Server:`, les numéros de version exposés dans les assets, etc.
+
+**3. Erreur non gérée.** `display_errors = 1` renvoie au visiteur le message d'erreur PHP brut : **chemin absolu des fichiers sur le serveur** (`/var/www/html/src/...`), nom de la classe et de la méthode, numéro de ligne, et selon le cas une requête SQL ou une valeur de paramètre. Nuance à souligner : en `APP_ENV=dev`, c'est la page d'erreur de Symfony qui s'affiche la plupart du temps, car le framework installe son propre gestionnaire d'erreurs. `display_errors` reprend la main dès que la panne survient **avant ou en dehors** de ce gestionnaire (erreur de parsing dans un fichier PHP, dépassement de `memory_limit`, erreur pendant le boot du kernel) — c'est-à-dire précisément dans les situations non maîtrisées. C'est pour ça que la directive doit être à `off` côté serveur même quand le framework gère déjà le cas nominal : c'est la ceinture en plus des bretelles, et elle ne dépend pas de la bonne configuration de l'application.
+
+**4. Rien n'est tracé.** `log_errors = 0` : une fois la réponse envoyée, il ne reste **aucune trace** de l'erreur côté serveur. Problème distinct du précédent, et c'est le point que le stagiaire doit formuler : `display_errors` est un problème de *confidentialité* (on en dit trop au visiteur), `log_errors` est un problème de *détection* (on ne sait rien de ce qui se passe). Les deux directives sont indépendantes, et la configuration actuelle est exactement l'inverse de ce qu'il faut : tout pour l'attaquant, rien pour l'exploitant. Sans journal, une campagne de scan ou une exploitation en cours est totalement invisible, et le post-mortem après incident est impossible.
+
+**5. Audit complet.** Attendu que le stagiaire aille au-delà des deux directives déjà croisées, en s'appuyant sur `php -i` (ou `phpinfo()`, ou `php -r 'var_dump(ini_get(...));'`) dans le conteneur :
+- `allow_url_fopen = 1` : permet à `file_get_contents()`, `fopen()`, etc. d'ouvrir une URL distante. Combiné à une entrée utilisateur non filtrée, c'est le vecteur SSRF / RFI
+- `allow_url_include = 0` : déjà correct (valeur par défaut de PHP), à laisser tel quel — le stagiaire doit vérifier, pas modifier au hasard
+- `session.use_strict_mode = 0` : PHP accepte un identifiant de session qu'il n'a pas généré lui-même, ce qui rend la fixation de session possible (l'attaquant impose un `PHPSESSID` connu de lui à la victime, puis réutilise la session une fois celle-ci authentifiée). À rapprocher explicitement de l'exercice 1 : la même problématique de cookie de session, mais cette fois côté serveur PHP et non côté framework
+- `disable_functions` (vide) et `open_basedir` (vide) : aucune restriction sur les fonctions d'exécution système ni sur les répertoires accessibles. Ce sont des mesures de **limitation de dégâts** : elles ne corrigent aucune faille, elles réduisent ce qu'un attaquant peut faire une fois qu'il exécute du code. Attention à ne pas les durcir aveuglément : `disable_functions` peut casser des besoins métier légitimes (génération de PDF, manipulation d'images via un binaire externe), et `open_basedir` casse l'application si le chemin des sessions, du cache ou des uploads sort du périmètre déclaré
+
+**6. Le correctif.** Point de vigilance central de l'exercice : **`expose_php` n'est pas modifiable depuis l'application**. C'est une directive `PHP_INI_PERDIR` : ni `ini_set()`, ni un appel dans `public/index.php`, ni une config Symfony ne peuvent la changer — elle est lue au démarrage du process. Un stagiaire qui tente un `ini_set('expose_php', 0)` et constate que l'en-tête est toujours là a trouvé le bon enseignement : cette catégorie de durcissement appartient à l'infrastructure, pas au code applicatif. Le correctif passe donc par un fichier `.ini` ajouté dans `/usr/local/etc/php/conf.d/` au build de l'image, puis un `make up-build` (un simple `make up` ne suffit pas, l'image doit être reconstruite).
+
+Fichier `docker/security.ini` (nouveau) :
+```ini
+expose_php = Off
+display_errors = Off
+log_errors = On
+error_log = /proc/self/fd/2
+allow_url_fopen = Off
+allow_url_include = Off
+session.use_strict_mode = On
+session.cookie_httponly = On
+session.cookie_secure = On
+```
+`docker/Dockerfile`, stage `base` :
+```diff
+ RUN echo "memory_limit=1G" > /usr/local/etc/php/conf.d/memory_limit.ini
+ RUN echo "post_max_size=256M" > /usr/local/etc/php/conf.d/post_max_size.ini
+ RUN echo "upload_max_filesize=256M" > /usr/local/etc/php/conf.d/upload_max_filesize.ini
++
++COPY docker/security.ini /usr/local/etc/php/conf.d/
+```
+`error_log = /proc/self/fd/2` envoie les erreurs sur la sortie d'erreur du conteneur, donc dans `docker compose logs php` — la façon normale de journaliser dans un environnement conteneurisé (écrire dans un fichier à l'intérieur du conteneur, c'est écrire dans quelque chose qui disparaît au prochain `docker compose down`). Un stagiaire qui configure un chemin de fichier classique n'a pas tort sur le principe, mais il faut lui faire remarquer ce point.
+
+Remarques sur les valeurs acceptables :
+- `disable_functions` et `open_basedir` : **ne pas les exiger**. Les mentionner comme mesures de limitation de dégâts, et valoriser le stagiaire qui les propose *en expliquant le risque de régression*. Un stagiaire qui remplit `disable_functions` avec une liste copiée d'un blog sans savoir ce qu'elle casse doit être repris
+- Durcir `display_errors` en `dev` rend le débogage moins confortable mais ne casse rien : Symfony continue d'afficher sa propre page d'erreur détaillée tant que `APP_DEBUG=1`. C'est un bon moment pour faire constater que les deux mécanismes sont bien indépendants
+
+**7. Revalider.** `curl -I https://localhost:8443/` : plus d'en-tête `x-powered-by`. Reprovoquer une erreur : plus de chemin serveur dans la réponse HTTP, et l'erreur apparaît désormais dans `docker compose logs php`. Naviguer sur le site, se connecter, poster un commentaire : tout doit fonctionner à l'identique.
+
+**8. Catégorie OWASP** : **A05:2021 – Security Misconfiguration** (A02 dans le classement 2025 présenté en cours). Même catégorie que l'exercice 1, et c'est volontaire : l'exercice 1 portait sur une protection du framework désactivée, celui-ci sur la couche en dessous — le serveur applicatif lui-même, que le framework ne configure pas et ne peut pas configurer à sa place.
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+---
+
+<a id="exercice-12-2"></a>
+## Exercice 12.2 — Upload de fichier
+
+**Livrable attendu** : le correctif (`UploaderService` et/ou `TopicType`, + éventuellement `Caddyfile`/`.htaccess` selon l'approche) sur la branche du stagiaire (question 5), et les réponses aux questions 4 (impact) et 7 (qualification + chaîne de failles) dans `exercises/reponses.md`. Les questions 1 à 3 et 6 sont de la démonstration — à vérifier en live/à l'oral.
+
+**État vulnérable** (déjà en place) : `App\Service\UploaderService::upload()` déplace le fichier reçu directement dans `public/uploads/topic/` — un répertoire servi par le serveur web et exécutable par PHP-FPM — en ne conservant que l'extension d'origine (`getClientOriginalExtension()`), **sans aucune vérification** de type MIME ni liste blanche d'extension. Le `FileType` de `TopicType` n'a pas non plus de contrainte `Image`/`File`. `Caddyfile` route tout `*.php` vers FPM (`php_fastcgi php:9000`), y compris sous `/uploads/`.
+
+Vérifié pendant le développement : un fichier `.php` déposé sous `public/uploads/topic/` est bien exécuté (`curl` sur son URL renvoie la sortie du script, `php_sapi_name()` = `fpm-fcgi`).
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1. Ce que le formulaire vérifie.** Rien côté serveur : `mapped => false` sur le champ, aucune contrainte `Image`, et `UploaderService` fait un `move()` brut. Le fichier finit dans `public/uploads/topic/`, servi statiquement par Caddy. C'est la conjonction des deux (pas de filtrage **et** répertoire exécutable) qui rend la suite possible.
+
+**2. Déposer un non-image.** Le champ `accept` HTML ne contraint que le sélecteur de fichiers du navigateur, pas la requête. Un `curl -F "topic[picture]=@shell.php;type=image/png"` (ou l'interception d'une requête légitime dont on remplace le corps) fait passer un `.php` sans problème. Note : à cause du renommage de l'exercice 12.3, le fichier est stocké sous `image-N.php` (l'extension `.php` est conservée) — le vecteur reste donc valide même avec ce renommage en place.
+
+**3. Exécution de code.** Payload minimal de démonstration :
+```php
+<?php echo 'PWNED:' . shell_exec($_GET['c']);
+```
+uploadé, puis appelé : `https://localhost:8443/uploads/topic/image-1.php?c=id`. Le serveur renvoie la sortie de `id` — preuve d'exécution de commandes arbitraires. Un `<?php phpinfo();` suffit aussi à prouver le point sans exécuter de commande système.
+
+**4. Impact.** Exécution de code arbitraire (RCE) dans le contexte du process PHP-FPM : lecture de `.env` (secret applicatif, `DATABASE_URL`, DSN mailer), accès complet à la base via les identifiants ainsi récupérés, lecture/écriture de n'importe quel fichier accessible à l'utilisateur FPM, dépôt d'un webshell persistant, pivot vers les autres conteneurs du réseau Docker. C'est la faille la plus grave du parcours : elle ne se contente pas d'exposer une donnée, elle donne la main sur le serveur.
+
+**5. Le correctif — défense en profondeur.** Aucune ligne unique ne suffit ; on attend au moins deux couches, et l'idée structurelle de la diapo 36 (séparer répertoire d'upload et répertoire exécutable) doit apparaître.
+
+*Couche 1 — filtrer ce qui entre* (`TopicType`, contrainte `Image` sur le champ) :
+```php
+use Symfony\Component\Validator\Constraints\Image;
+
+->add('picture', FileType::class, [
+    // ...
+    'constraints' => [
+        new Image(
+            mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+            mimeTypesMessage: 'Merci de fournir une image valide (jpeg, png, webp).',
+        ),
+    ],
+])
+```
+La contrainte `Image` vérifie le type MIME réel (via `getMimeType()`, basé sur le contenu, pas sur l'extension ni l'en-tête `Content-Type` fourni par le client) et refuse un `.php` renommé en `.png`.
+
+*Couche 2 — ne jamais faire confiance à l'extension cliente* (`UploaderService`) : dériver l'extension du type réel plutôt que de `getClientOriginalExtension()`.
+```diff
+-        $filename = 'image-' . $count . '.' . $file->getClientOriginalExtension();
++        $filename = 'image-' . $count . '.' . $file->guessExtension();
+```
+(si l'exercice 12.3 a déjà été fait, la ligne de départ utilise `bin2hex(random_bytes(16))` au lieu de `$count` — le principe est identique : remplacer `getClientOriginalExtension()` par `guessExtension()`.)
+(`guessExtension()` déduit l'extension du MIME détecté ; combiné à la couche 1, un fichier non-image n'atteint jamais ce point.)
+
+*Couche 3 — structurelle, la plus importante selon la diapo* : que même un fichier malveillant passé malgré tout ne soit pas exécutable. Deux façons :
+- **Sortir le dossier d'upload de la racine web** (`var/uploads/` au lieu de `public/uploads/`) et servir les images via un contrôleur qui lit le fichier et renvoie une `BinaryFileResponse` — Caddy ne voit alors plus jamais ces fichiers, donc ne peut plus les exécuter. C'est la réponse « propre » attendue.
+- **Ou** interdire l'exécution PHP sous `/uploads/` au niveau de Caddy (ne pas router ce chemin vers `php_fastcgi`). Acceptable, mais plus fragile qu'écarter physiquement les fichiers du web root.
+
+*Lien avec 12.1* : `disable_functions` (neutralise `shell_exec`, `system`, `exec`…) et `open_basedir` réduisent ce qu'un webshell peut faire une fois exécuté — mais **ne corrigent pas** la faille : le code s'exécute toujours, il est juste moins capable. À présenter comme limitation de dégâts, exactement comme la CSP vis-à-vis des XSS.
+
+Un stagiaire qui ne pose que la couche 1 a le réflexe le plus courant mais pas le plus solide (un bug de détection MIME, un `.phar`, une future extension exécutable réintroduisent la faille) ; l'objectif pédagogique est qu'il formule que la mesure qui *tient dans le temps* est de rendre le répertoire non exécutable.
+
+**6. Revalider.** Après correctif : l'upload d'un `.php` est refusé par la validation (couche 1) ; et si on force un dépôt malgré tout, l'URL du fichier ne déclenche plus d'exécution (couche 3). Une vraie image se publie et s'affiche normalement.
+
+**7. Qualification.** La faille finale est une **RCE (Remote Code Execution)**. Elle n'est pas monolithique : elle résulte d'une **chaîne** — absence de filtrage à l'upload (*Unrestricted File Upload*, CWE-434) **+** stockage dans un répertoire exécutable par le serveur web. Retirer l'un des deux maillons casse la chaîne. C'est le point central : la gravité vient de la combinaison, pas d'un bug isolé. Catégorie OWASP : rattachée à **A05:2021 – Security Misconfiguration** pour le volet répertoire exécutable, la partie upload relevant du contrôle d'entrée (A04 – Insecure Design / validation).
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-12-3"></a>
+## Exercice 12.3 — Images à URL prédictibles
+
+**Livrable attendu** : le correctif de `src/Service/UploaderService.php` sur la branche du stagiaire (question 5), et la réponse à la question 4 (en quoi c'est un problème) dans `exercises/reponses.md`. Exercice court. Les questions 1 à 3 et 6 sont de la démonstration — à vérifier en live/à l'oral.
+
+**État vulnérable** (déjà en place) : `UploaderService::upload()` renomme chaque image de façon séquentielle et devinable — `image-1.<ext>`, `image-2.<ext>`, etc. — en comptant les fichiers déjà présents dans le dossier cible :
+```php
+$count = count(glob($targetDir . '/image-*')) + 1;
+$filename = 'image-' . $count . '.' . $file->getClientOriginalExtension();
+```
+Le chemin public stocké et servi est donc `/uploads/topic/image-1.png`, `/uploads/topic/image-2.png`… Il suffit d'incrémenter le numéro dans l'URL pour parcourir **toutes** les images uploadées, sans jamais passer par la page du sujet correspondant.
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1-2. Constater le pattern.** Deux sujets créés avec image donnent `/uploads/topic/image-1.png` et `/uploads/topic/image-2.png`. Le nommage est purement séquentiel : rien d'aléatoire, rien lié à l'utilisateur ou au sujet.
+
+**3. Énumérer.** En changeant juste le numéro dans l'URL, on récupère n'importe quelle image, y compris celle d'un sujet qu'on n'a pas ouvert. C'est un accès direct à la ressource (IDOR sur le nom de fichier), la même logique que l'énumération de comptes de l'exercice 11, appliquée à des fichiers.
+
+**4. Le problème.** Le contrôle d'accès (ou l'absence de publication) au niveau du sujet ne protège pas le fichier : l'image est servie directement par le serveur web depuis `public/`, sans passer par Symfony. Un tiers qui devine l'URL récupère le contenu même si le sujet est privé, supprimé, ou pas encore publié. Le nommage prédictible transforme « il faut connaître l'URL » (obscurité) en « il suffit de compter » (énumération triviale).
+
+---
+
+### Fix — nom non devinable via `bin2hex(random_bytes(16))`
+
+`src/Service/UploaderService.php` :
+```diff
+     public function upload(UploadedFile $file, string $directory): string
+     {
+         $targetDir = $this->uploadDir . '/' . $directory;
+
+-        $count = count(glob($targetDir . '/image-*')) + 1;
+-        $filename = 'image-' . $count . '.' . $file->getClientOriginalExtension();
++        $filename = 'image-' . bin2hex(random_bytes(16)) . '.' . $file->getClientOriginalExtension();
+
+         $file->move($targetDir, $filename);
+
+         return '/uploads/' . $directory . '/' . $filename;
+     }
+```
+`random_bytes(16)` tire 16 octets sur le générateur cryptographique du système, que `bin2hex()` transforme en 32 caractères hexadécimaux (`image-9f3c1a...e04b.png`). L'URL n'est plus ni séquentielle ni devinable : l'énumération disparaît. Le chemin reste stocké en base et servi normalement, donc l'affichage d'une image légitime est inchangé.
+
+**Pourquoi pas `uniqid()` ?** C'est la proposition la plus fréquente en salle, et elle est *bonne dans l'intention* : elle casse effectivement le nommage séquentiel, ce qui est le vrai sujet de l'exercice. Un stagiaire qui la propose a compris le problème — il faut le valider. Mais elle est **insuffisante comme réflexe à emporter**, pour deux raisons :
+
+1. **`uniqid()` n'est pas aléatoire, il est temporel.** Sa valeur est l'horodatage courant en microsecondes, converti en hexa — rien de plus. Deux uploads consécutifs donnent deux valeurs quasi identiques, et il suffit d'uploader soi-même une image pour connaître l'instant de référence. L'espace à explorer autour se compte alors en quelques millions de valeurs : c'est du brute force à la portée d'un script, pas un secret.
+2. **C'est l'habitude qui est dangereuse.** Ici l'enjeu est modeste (des images), mais le même `uniqid()` se retrouve régulièrement sur des jetons de réinitialisation de mot de passe, des codes d'activation, des identifiants de session — où la prédictibilité devient une prise de compte. Autant prendre tout de suite le bon réflexe : **dès qu'une valeur doit être non devinable, c'est `random_bytes()`**, jamais `uniqid()`, `rand()`, `mt_rand()` ni `md5(time())`.
+
+Le coût est identique (une ligne, une fonction native), donc il n'y a aucune raison de choisir la version faible. À signaler : le projet faisait la même erreur sur `SecurityController::register()` pour l'`activationCode` — corrigé de la même façon.
+
+**Point à faire ressortir** : même avec un nom parfaitement aléatoire, l'image reste servie en accès public par le serveur web — quiconque a l'URL (partagée, dans un log, dans un en-tête `Referer`, dans le HTML de la page) y accède toujours. Un nom imprévisible n'est pas un contrôle d'accès, c'est de la sécurité par l'obscurité. Pour une vraie confidentialité (image réservée à certains utilisateurs), il faudrait servir le fichier via un contrôleur Symfony qui applique un contrôle d'accès, et sortir le dossier de `public/`. Hors périmètre de cet exercice court, mais bonne piste de discussion — le renommage corrige l'énumération, pas l'exposition publique.
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+---
+
+<a id="exercice-13"></a>
+## Exercice 13 — Audit des dépendances
+
+**Livrable attendu** : le `composer.lock` mis à jour sur la branche du stagiaire (question 3), et les réponses aux questions 4 (paquets abandonnés), 5 (automatisation) et 6 (la sécurité dans le temps) dans `exercises/reponses.md`. Les questions 1-2 sont de la lecture de rapport — à vérifier en live/à l'oral.
+
+**État vulnérable** : rien n'a été introduit exprès. Les dépendances du projet, figées dans `composer.lock`, ont simplement pris de l'âge : au moment d'écrire ces lignes, `composer audit` remonte **plusieurs advisories réelles** sur des paquets Symfony (`symfony/http-foundation`, `symfony/routing`, `symfony/security-http`) et sur `twig/twig`, plus deux **paquets abandonnés** (`sebastian/*`, tirés par PHPUnit). Le nombre exact évoluera avec le temps — c'est justement le propos de l'exercice.
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1. Lancer l'audit.** `composer audit` (dans le conteneur `php`), livré avec Composer, sans rien à installer. Il compare les versions figées dans `composer.lock` à la base publique d'avis de sécurité PHP et liste les advisories, leur sévérité, les versions affectées et corrigées. `symfony console check:security` (Symfony CLI) fait l'équivalent — accepter les deux.
+
+**2. Lire un rapport.** Pour une advisory donnée, le stagiaire doit savoir extraire : le **paquet** concerné, la ligne **Affected versions** (les plages vulnérables), et en déduire la **première version corrigée** (la borne haute de la dernière plage affectée). Exemple type : une faille corrigée en `7.4.x` alors que le projet est figé sur une version antérieure de la même branche.
+
+**3. Corriger.** Ici, toutes les failles remontées sont dans des paquets Symfony/Twig déjà présents dans des branches compatibles avec les contraintes du `composer.json` (`7.4.*`, `^3.0`…) : un simple `composer update` (éventuellement ciblé, `composer update symfony/* twig/twig`) suffit à passer aux versions corrigées, **sans changer une ligne de code applicatif**. Relancer `composer audit` : les advisories corrigées disparaissent. Ce qui a changé : uniquement les numéros de version (et les hash) dans `composer.lock` — d'où l'importance de committer ce fichier, c'est lui qui fige ce qui tourne réellement.
+   - Point à souligner : si une faille n'était corrigée que dans une version majeure supérieure interdite par le `composer.json` (ex. la faille est fixée en `8.0` alors qu'on est contraint en `7.4.*`), `composer update` ne suffirait pas — il faudrait relever la contrainte, ce qui devient une vraie montée de version, avec ses risques de régression. Ce n'est pas le cas ici, mais c'est le scénario réaliste à mentionner.
+
+**4. Paquets abandonnés.** Non, un paquet « abandonné » n'est **pas** une vulnérabilité : c'est un paquet dont le mainteneur a annoncé qu'il ne le maintiendrait plus. Ce n'est pas une faille aujourd'hui, mais un **risque futur** (aucun correctif ne viendra si une faille est découverte). Ici les deux paquets signalés (`sebastian/*`) sont des dépendances *de développement* tirées par PHPUnit, jamais déployées en production : l'impact est nul, rien à faire dans l'immédiat. Le bon réflexe est de distinguer « faille à corriger maintenant » de « dette à surveiller ». Ne pas exiger d'action sur ces paquets.
+
+**5. Automatiser.** L'audit ne doit pas dépendre de la mémoire d'un développeur. Réponses acceptables : ajouter `composer audit` comme **étape de CI** qui fait échouer le build si une faille est trouvée (le code de sortie est non nul quand il y a des advisories) ; un **hook** de pré-déploiement ; ou un outil de veille continue type **Dependabot** / **Renovate** qui ouvre automatiquement des PR de montée de version. L'idée clé attendue : déplacer la vérification *en amont de la mise en production*, de façon systématique.
+
+**6. Prendre du recul.** Le point pédagogique final : **la sécurité n'est pas un état figé**. Ce projet n'a pas changé d'une ligne, et pourtant il est devenu vulnérable, simplement parce que des failles ont été *découvertes* dans du code qu'on exécute sans l'avoir écrit. Un audit passé au vert aujourd'hui ne garantit rien pour dans six mois. La sécurité d'un projet est un processus continu (cf. la diapo « la sécurité, un cycle »), pas une case cochée une fois pour toutes — c'est exactement pour ça que l'audit doit être automatisé (question 5) plutôt que joué ponctuellement.
+
+**Catégorie OWASP** : **A03:2025 – Chaîne d'approvisionnement** (Software Supply Chain Failures), qui élargit l'ancien *A06:2021 – Vulnerable and Outdated Components*.
+
+[⬆ Retour au sommaire](#sommaire)
+
+---
+
+<a id="exercice-14"></a>
+## Exercice 14 — Politique de mot de passe
+
+**Livrable attendu** : le correctif sur la branche du stagiaire (question 5 — `src/Entity/User.php` **et** `src/Form/RegistrationType.php`), et les réponses aux questions 3 (ce que disent CNIL/NIST), 4 (les autres portes d'entrée) et 7 (prise de recul) dans `exercises/reponses.md`. Les questions 1, 2 et 6 sont de l'observation — à vérifier en live.
+
+**État vulnérable** (déjà en place) : le champ `plainPassword` de `RegistrationType` ne porte qu'un `NotBlank()`. N'importe quel mot de passe d'un seul caractère est accepté :
+```php
+->add('plainPassword', RepeatedType::class, [
+    'type' => PasswordType::class,
+    'mapped' => false,
+    // ...
+    'constraints' => [
+        new NotBlank(),
+    ],
+])
+```
+
+**Exercice volontairement « bateau »** : la mesure est évidente et connue de tous. L'intérêt pédagogique n'est pas *quelle* règle, mais **où on la pose** (questions 4-5) et **quelles règles sont réellement efficaces** (question 3) — deux points sur lesquels l'intuition de la majorité des stagiaires est fausse.
+
+---
+
+### Étape par étape (à dérouler avec le stagiaire)
+
+**1. Constater.** Un mot de passe `a` passe. Le compte est créé, l'e-mail d'activation part, et la connexion fonctionne. Aucune règle de qualité n'existe.
+
+**2. Lire le code.** Le stagiaire doit trouver `RegistrationType.php` et le `new NotBlank()` isolé. Le point à faire préciser : **le stockage, lui, est correct** — `SecurityController::register()` passe par `UserPasswordHasherInterface::hashPassword()`, donc le mot de passe est haché, jamais stocké en clair. Il faut que le stagiaire sépare nettement les deux sujets : *bien stocker* un mot de passe faible ne le rend pas fort ; *bien choisir* un mot de passe stocké en clair ne protège de rien. Les deux sont nécessaires, aucun ne remplace l'autre.
+
+**3. Définir la politique — le contre-pied attendu.** La réponse spontanée est presque toujours « 8 caractères, une majuscule, un chiffre, un caractère spécial ». **C'est la réponse d'il y a quinze ans, et elle est aujourd'hui déconseillée** par le NIST (SP 800-63B) comme par la CNIL (délibération n° 2022-100). Raison : ces règles de composition produisent `Bonjour2026!` — formellement conforme, et présent dans tous les dictionnaires d'attaque. Elles font porter la charge à l'utilisateur sans augmenter l'entropie réelle, et le poussent vers des variantes prévisibles (`P@ssw0rd`, incrémentation d'un chiffre à chaque changement obligatoire).
+
+Ce qui est réellement efficace, par ordre de gain :
+
+| Mesure | Effet réel |
+|---|---|
+| **Longueur minimale** (12, idéalement 14+) | Le seul facteur d'entropie qui compte vraiment |
+| **Rejet des mots de passe compromis** | Bloque le *credential stuffing*, qui est l'attaque réellement pratiquée |
+| **Rate limiting / throttling sur le login** | Rend le brute force en ligne inopérant, quel que soit le mot de passe |
+| **MFA** | Seule mesure qui protège encore si le mot de passe est connu |
+| Règles de composition | Marginal, souvent contre-productif |
+
+Corollaires à mentionner : pas d'expiration périodique forcée (déconseillée, elle dégrade la qualité des mots de passe choisis), et il faut **autoriser le coller** et positionner `autocomplete="new-password"` pour ne pas casser les gestionnaires de mots de passe — l'ergonomie va ici dans le même sens que la sécurité.
+
+**4. Les autres portes d'entrée — le cœur de l'exercice.** Poser la règle dans `RegistrationType` ne protège **que ce formulaire**. Or un mot de passe peut entrer dans l'application par :
+- l'**API** (API Platform est installé et expose déjà `User`) ;
+- les **fixtures** et les commandes de console ;
+- un **futur formulaire** de réinitialisation ou de changement de mot de passe — celui qu'on ajoutera dans six mois en oubliant d'y recopier les contraintes.
+
+D'où la règle générale : **une contrainte métier appartient au modèle, pas à un formulaire.** Le formulaire est une porte ; l'entité est la pièce. C'est la formulation à faire ressortir.
+
+**5. Le correctif.**
+
+*a — Ajouter une propriété non persistée sur l'entité.* `src/Entity/User.php` :
+```diff
++use Symfony\Component\Validator\Constraints as Assert;
++
+ class User implements UserInterface, PasswordAuthenticatedUserInterface
+ {
+     // ...
+
++    /**
++     * Mot de passe en clair, jamais persisté : sert uniquement de support
++     * aux contraintes de validation avant hachage.
++     */
++    #[Assert\NotBlank(groups: ['registration'])]
++    #[Assert\Length(
++        min: 12,
++        max: 4096,
++        minMessage: 'Votre mot de passe doit contenir au moins {{ limit }} caractères.',
++    )]
++    #[Assert\PasswordStrength(
++        minScore: Assert\PasswordStrength::STRENGTH_MEDIUM,
++        message: 'Ce mot de passe est trop faible, choisissez-en un moins prévisible.',
++    )]
++    #[Assert\NotCompromisedPassword(
++        message: 'Ce mot de passe figure dans une fuite de données connue, choisissez-en un autre.',
++    )]
++    private ?string $plainPassword = null;
++
++    public function getPlainPassword(): ?string
++    {
++        return $this->plainPassword;
++    }
++
++    public function setPlainPassword(?string $plainPassword): static
++    {
++        $this->plainPassword = $plainPassword;
++
++        return $this;
++    }
++
++    public function eraseCredentials(): void
++    {
++        $this->plainPassword = null;
++    }
+```
+Aucun `#[ORM\Column]` : la propriété n'existe qu'en mémoire, rien à migrer. Aucun `#[Groups]` non plus : elle ne doit jamais être sérialisée par API Platform.
+
+*b — Brancher le formulaire sur l'entité.* `src/Form/RegistrationType.php` — le champ devient mappé et perd ses contraintes locales, qui feraient doublon :
+```diff
+             ->add('plainPassword', RepeatedType::class, [
+                 'type' => PasswordType::class,
+-                'mapped' => false,
+                 'first_options' => [
+                     'label' => 'register.password_label',
+-                    'attr' => ['class' => 'form-control'],
++                    'attr' => ['class' => 'form-control', 'autocomplete' => 'new-password'],
+                 ],
+                 'second_options' => [
+                     'label' => 'register.password_confirm_label',
+-                    'attr' => ['class' => 'form-control'],
++                    'attr' => ['class' => 'form-control', 'autocomplete' => 'new-password'],
+                 ],
+                 'invalid_message' => 'Les mots de passe ne correspondent pas.',
+-                'constraints' => [
+-                    new NotBlank(),
+-                ],
+             ])
+```
+et déclarer le groupe de validation :
+```diff
+         $resolver->setDefaults([
+             'data_class' => User::class,
+             'translation_domain' => 'messages',
++            'validation_groups' => ['Default', 'registration'],
+         ]);
+```
+
+*c — Adapter le contrôleur.* `src/Controller/SecurityController.php` — lire le mot de passe sur l'entité, et l'effacer une fois haché :
+```diff
+-            $user->setPassword($passwordHasher->hashPassword($user, $form->get('plainPassword')->getData()))
++            $user->setPassword($passwordHasher->hashPassword($user, $user->getPlainPassword()))
+                 ->setRoles([])
+                 ->setCreatedAt(new \DateTime())
+                 ->setActivationCode(bin2hex(random_bytes(16)));
++
++            $user->eraseCredentials();
+```
+
+**Ce que font les contraintes** :
+- `Length(min: 12)` — le facteur d'entropie. Le `max: 4096` n'est pas décoratif : sans borne haute, un mot de passe de plusieurs mégaoctets soumis à bcrypt/argon devient un déni de service applicatif.
+- `PasswordStrength` — mesure l'entropie réelle (logique zxcvbn) au lieu de cocher des classes de caractères : `Bonjour2026!` est rejeté, `girafe-tabouret-orage` est accepté. C'est exactement le renversement de la question 3, rendu concret.
+- `NotCompromisedPassword` — interroge l'API Have I Been Pwned. **Point de discussion à ne pas manquer** : la question « on envoie le mot de passe des utilisateurs à un tiers ?! » tombe systématiquement. Non : la contrainte utilise le *k-anonymity*, seuls les **5 premiers caractères du SHA-1** partent sur le réseau, l'API renvoie tous les hash correspondant à ce préfixe, et la comparaison finale se fait localement. Le mot de passe ne quitte jamais le serveur. À noter aussi qu'elle échoue « ouverte » si l'API est injoignable, et qu'elle suppose un accès réseau sortant — en environnement fermé, on la remplace par une liste locale.
+
+**Note formateur — le piège du `NotBlank`** : c'est la seule contrainte qui pose problème sur l'entité. `Length`, `PasswordStrength` et `NotCompromisedPassword` ignorent nativement `null` et la chaîne vide, donc elles ne gênent jamais la validation d'un `User` existant dont `plainPassword` est vide (édition de profil, validation déclenchée par API Platform…). `NotBlank`, lui, ferait échouer toute validation d'un utilisateur déjà en base. D'où le groupe `registration`, activé uniquement par le formulaire d'inscription. Un stagiaire qui pose un `NotBlank` sans groupe aura un correctif qui « marche » à l'inscription et casse ailleurs : très bon moment pour faire toucher du doigt les groupes de validation.
+
+**6. Revalider.** `a` → refusé (longueur). `motdepassemotdepasse` → 20 caractères, passe la longueur, mais rejeté par `NotCompromisedPassword`. `Azertyuiop123456` → rejeté (compromis et/ou score trop faible). `girafe-tabouret-orage` → accepté. Faire lire les messages d'erreur : ils doivent **énoncer la règle**, pas se contenter de « mot de passe invalide » — un message opaque conduit l'utilisateur à tâtonner vers le mot de passe le plus faible qui passe.
+
+**7. Prendre du recul.** Non, une politique stricte ne suffit pas. Elle réduit la probabilité qu'un mot de passe soit deviné, mais :
+- contre le brute force en ligne, ce sont le **login throttling** (exercice 9) et le **rate limiter** (exercice 10) qui agissent ;
+- contre l'énumération de comptes qui précède l'attaque, c'est l'exercice 11 ;
+- et si le mot de passe est déjà connu de l'attaquant (fuite, phishing, keylogger), **aucune politique ne protège plus** : seule la **MFA** le fait.
+
+Le message de fin : la politique de mot de passe est une couche parmi d'autres, et c'est probablement celle sur laquelle on a le moins de levier réel — puisqu'elle dépend in fine d'un choix humain. Bonne illustration de la défense en profondeur.
+
+**Catégorie OWASP** : **A07:2021 – Identification and Authentication Failures** (exigences de mot de passe faibles ou absentes, et absence de vérification contre les mots de passe compromis).
 
 [⬆ Retour au sommaire](#sommaire)

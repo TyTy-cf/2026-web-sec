@@ -101,14 +101,14 @@ Any user can modify the topic of anyone, no checking on the owner are made.
 The files impacted are `TopicController.php`, specially `edit` function, and `front/topic/show.html.twig`
 
 
-### 2.6 Content Security Policy
+### 2.6 HTTP security headers (CSP, HSTS, X-Frame-Options)
 
 
-Unlike the previous features, this one is a missing hardening measure rather than a bad practice: no CSP header is configured anywhere in the app.
+Unlike the previous features, this one is a missing hardening measure rather than a bad practice: no security header is configured anywhere in the app — no `Content-Security-Policy`, no `Strict-Transport-Security`, no `X-Frame-Options`. The `Caddyfile` serves `https://localhost:8443` with no `header` directive at all.
 
-- [x] No `Content-Security-Policy` header on purpose, and no code was written for this exercise
+- [x] No security header on purpose, and no code was written for this exercise
 
-Trainees have to research where a CSP actually belongs (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement it themselves (e.g. NelmioSecurityBundle config, a header set in the `Caddyfile`, or a custom Symfony listener), then verify it mitigates the payloads from exercises 2.2, 2.3 and 2.4 (the three XSS flavours) without the underlying bugs being fixed. Do not implement this in the app; the exercise is precisely to have them find and add the solution.
+Trainees have to research where these headers belong (not `security.yaml`, despite the name — that file only handles Symfony's authentication/authorization firewall) and implement them themselves (e.g. NelmioSecurityBundle config, `header` directives in the `Caddyfile`, or a custom Symfony listener). The CSP part (questions 1-7) is verified against the payloads from exercises 2.2, 2.3 and 2.4 (the three XSS flavours) without the underlying bugs being fixed. Questions 8-9 add HSTS (transport downgrade / SSL stripping, with the `max-age` mnemonic about starting short) and X-Frame-Options (clickjacking, demonstrated with an external `<iframe>` trap page). Do not implement this in the app; the exercise is precisely to have them find and add the solution.
 
 
 ### 2.7 Cross-Site Request Forgery (CSRF)
@@ -173,6 +173,66 @@ Deliberate pedagogical link to §2.10: rate-limiting `/inscription` (that exerci
 The fix is expected to stay minimal: drop `#[UniqueEntity]`, only create the account and send the confirmation email when the address is free, and show the same neutral message in both cases (the `UNIQUE` constraint on `user.email` stays as the database-level safety net). Trainees verify it through Mailpit: a confirmation email goes out for a fresh address, none for an already-registered one. The actual controller/entity diff is documented in full in `exercises/correction.md`.
 
 
+### 2.12.1 PHP configuration hardening (`php.ini`)
+
+
+First half of a §2.12 block about configuration-level flaws (php.ini, environment variables) covered in the course slides 33-38. Like §2.6 (CSP) and §2.9 (Login Throttling), this is a missing hardening measure rather than an injected bug: the image starts from `php:8.2-fpm` and never ships a `php.ini`, so every security-relevant directive sits at its stock value.
+
+- [x] `docker/Dockerfile` (stage `base`) only sets `memory_limit`, `post_max_size` and `upload_max_filesize` in `/usr/local/etc/php/conf.d/`, no security directive at all, on purpose
+
+Effective values in the container: `expose_php=1` (so every response carries `x-powered-by: PHP/8.2.33`), `display_errors=1`, `log_errors=0`, `allow_url_fopen=1`, `session.use_strict_mode=0`, empty `disable_functions` and `open_basedir`. `allow_url_include=0` is already correct (PHP's own default) and is there for trainees to audit, not to change.
+
+The file impacted is `docker/Dockerfile` only (unmodified). No PHP/Twig/config code involved — deliberately, since the point of the exercise is that this layer is *not* reachable from the application: `expose_php` is `PHP_INI_PERDIR`, so `ini_set()` on it returns `false` and the fix must go through a `.ini` file added at image build time (plus `make up-build`, not just `make up`).
+
+The exercise deliberately does **not** cover `APP_ENV`/`APP_DEBUG` (dev vs prod error display): that's stock Symfony behavior, not a flaw to fix. The correction mentions it only to make clear that `display_errors` and Symfony's error handler are independent layers.
+
+Note: HSTS and `X-Frame-Options` (slide 38) are also absent from the `Caddyfile` — not claimed by this exercise, see §3.2.
+
+
+### 2.12.2 File upload → RCE
+
+
+The topic form (`TopicType`, used by both `app_topic_new` — `GET|POST /sujet/nouveau` — and `app_topic_edit`) has a `picture` file field, handled by `App\Service\UploaderService::upload($file, 'topic')`. The upload is **deliberately unsafe**: the uploaded file is `move()`d straight into `public/uploads/topic/` (a web-served directory), with no extension filtering and no MIME check. The `isNew` form option makes the image required on creation, optional on edit (keeps the previous one). The "Nouveau sujet" link on the home page shows only to logged-in users.
+
+- [x] No extension/MIME filtering, upload target inside `public/` on purpose
+
+`Caddyfile` routes every `*.php` to FPM including under `/uploads/`, so a `.php` uploaded through the form is served AND executed → RCE (verified: a probe `.php` under `public/uploads/topic/` runs, `php_sapi_name()` = `fpm-fcgi`). Matches course slide 36. The expected fix is defense-in-depth: `Image` constraint on the field, derive the extension from the real MIME (`guessExtension()`), and — the structural fix — move the upload dir out of the web root (serve via a controller) or block PHP execution under `/uploads/` in Caddy. `disable_functions`/`open_basedir` (§2.12.1) only limit damage, they don't fix it. `UploaderService` takes the sub-directory as a parameter (`topic`, and later `user`) so this generalizes. Full walkthrough in `exercises/correction.md`.
+
+Note: because of §2.12.3's renaming, the uploaded file lands as `image-N.php` (the `.php` extension is preserved), so the RCE vector holds even with that renaming in place.
+
+
+### 2.12.3 Predictable image URLs (enumeration)
+
+
+`UploaderService::upload()` renames each image sequentially — `image-1.<ext>`, `image-2.<ext>`, … — by counting existing `image-*` files in the target dir. The stored/served path (`/uploads/topic/image-1.png`) is therefore trivially guessable: incrementing the number walks every uploaded image without going through the topic page (IDOR on the filename).
+
+- [x] Sequential, guessable `image-N` filenames in `UploaderService`, on purpose
+
+The file impacted is `src/Service/UploaderService.php` only. Short exercise; the fix is to make the name non-guessable with `bin2hex(random_bytes(16))` (`image-<32 hex chars>.<ext>`; `uniqid()` is the common trainee answer — right intent, but time-based and therefore brute-forceable, so the correction pushes the CSPRNG). Full diff in `exercises/correction.md`. The correction notes that this only removes enumeration, not the public exposure of the file itself (that would require serving through a controller with an access check — out of scope).
+
+
+### 2.13 Dependency audit (supply chain)
+
+
+Not an injected bug and no code involved: the project's pinned dependencies in `composer.lock` have simply aged, so `composer audit` (or `symfony console check:security`) reports real security advisories — currently several on `symfony/*` and `twig/twig`, plus a couple of abandoned dev-only packages (`sebastian/*`). The exact count drifts over time, which is the whole point of the exercise. Matches course slides 56-57 (supply chain / audit).
+
+- [x] No hardening beyond running the audit; the vulnerable state emerges on its own as advisories are published
+
+Short exercise: run the audit, read one advisory (affected vs fixed versions), fix with `composer update` (the current findings are all within the `composer.json` constraints, so no code change), tell abandoned packages apart from vulnerabilities, and automate the check (CI / Dependabot / Renovate). The takeaway is that security is not a fixed state — an untouched project becomes vulnerable as flaws are discovered in third-party code. OWASP A03:2025 (Software Supply Chain Failures). Full walkthrough in `exercises/correction.md`.
+
+Note: the fix here mutates `composer.lock` (and pulls newer vendor code). If replaying the exercise from a clean state matters, stash/restore `composer.lock` — the "vulnerable" state is whatever advisories exist at that moment, not a fixed diff.
+
+
+### 2.14 Weak password policy (Identification and Authentication Failures)
+
+
+`RegistrationType::buildForm()` puts a lone `NotBlank()` on the non-mapped `plainPassword` field, so a one-character password is accepted. Storage itself is fine (`UserPasswordHasherInterface::hashPassword()` is used), so the exercise is strictly about password *quality*, not hashing.
+
+- [x] `plainPassword` constrained only by `NotBlank()` in `src/Form/RegistrationType.php`
+
+Deliberately a "textbook" exercise — everyone knows the measure. The teaching value is in two counter-intuitive points: (1) composition rules ("1 uppercase, 1 digit, 1 symbol") are discouraged by NIST SP 800-63B and CNIL 2022-100 in favour of length + a compromised-password check; (2) the constraint belongs on the **entity**, not the form, because the form is only one entry point (API Platform exposes `User`, plus fixtures and a future reset-password form). The fix adds a non-persisted `$plainPassword` property on `User` carrying `Length(min: 12, max: 4096)`, `PasswordStrength`, `NotCompromisedPassword` and a group-scoped `NotBlank`, flips the form field to mapped with `validation_groups: ['Default', 'registration']`, and erases the plaintext after hashing. The `NotBlank` group matters: the other three constraints skip `null`, `NotBlank` does not, so an ungrouped one breaks validation of existing users. OWASP A07:2021. Full walkthrough in `exercises/correction.md`.
+
+
 ## 3. Reserved for later (not yet an exercise)
 
 
@@ -185,4 +245,3 @@ These exist in the app for live demos during class, but have no entry in `exerci
 `CommentController::delete` — even after the CSRF fix from exercise 2.7 (`POST` + token), the route still has **no login check and no ownership check at all**: any authenticated user can delete any comment by ID, not just their own. The delete link in `templates/front/topic/show.html.twig` is shown only when `app.user == comment.author` (client-side only, same superficial pattern as the topic Edit button from exercise 2.5).
 
 Planned follow-up (not implemented, not scheduled yet): add an ownership/login check as its own exercise, once exercise 2.7 (CSRF) has been covered.
-

@@ -54,7 +54,7 @@ class SecurityController extends AbstractController
             $user->setPassword($passwordHasher->hashPassword($user, $form->get('plainPassword')->getData()))
                 ->setRoles([])
                 ->setCreatedAt(new \DateTime())
-                ->setActivationCode(uniqid());
+                ->setActivationCode(bin2hex(random_bytes(16)));
 
             $entityManager->persist($user);
             $entityManager->flush();

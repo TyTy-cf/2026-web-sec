@@ -26,12 +26,17 @@
 - [Exercice 3 — Cross-Site Scripting (XSS)](#exercice-3)
 - [Exercice 4 — Cross-Site Scripting (XSS)](#exercice-4)
 - [Exercice 5 — Broken Access Control](#exercice-5)
-- [Exercice 6 — Content Security Policy (CSP)](#exercice-6)
+- [Exercice 6 — En-têtes HTTP de sécurité](#exercice-6)
 - [Exercice 7 — Cross-Site Request Forgery (CSRF)](#exercice-7)
 - [Exercice 8 — Integrity of JWT](#exercice-8)
 - [Exercice 9 — Login Throttling](#exercice-9)
 - [Exercice 10 — Rate Limiter](#exercice-10)
 - [Exercice 11 — Account Enumeration](#exercice-11)
+- [Exercice 12.1 — Durcissement de `php.ini`](#exercice-12-1)
+- [Exercice 12.2 — Upload de fichier](#exercice-12-2)
+- [Exercice 12.3 — Images à URL prédictibles](#exercice-12-3)
+- [Exercice 13 — Audit des dépendances](#exercice-13)
+- [Exercice 14 — Politique de mot de passe](#exercice-14)
 
 
 <a id="exercice-1"></a>
@@ -197,13 +202,13 @@
 
 
 <a id="exercice-6"></a>
-# Exercice 6 — Content Security Policy (CSP)
+# Exercice 6 — En-têtes HTTP de sécurité
 
 
 ## Pour commencer
 
 
-- Aucune CSP n'est configurée sur l'application pour l'instant
+- Aucun en-tête de sécurité n'est configuré sur l'application pour l'instant : ni `Content-Security-Policy`, ni `Strict-Transport-Security`, ni `X-Frame-Options`
 - Gardez sous la main les charges utiles des exercices 2, 3 et 4 : vous allez les rejouer plus tard dans cet exercice (repartez de la branche `main`pour cet exercice, vous devez avoir une branche avec des failles)
 - Vous n'avez pas besoin d'avoir corrigé les exercices précédents pour faire celui-ci
 
@@ -218,6 +223,8 @@
 5. **Vérifier les dégâts collatéraux.** Une politique stricte peut casser des fonctionnalités légitimes du site qui reposaient sur du JavaScript inline. Explorez le site à la recherche d'une fonctionnalité qui ne marche plus. Trouvez pourquoi, et corrigez-la sans réintroduire de faille
 6. **Prendre du recul.** La CSP a-t-elle corrigé une seule des failles des exercices précédents ? Si un attaquant trouve un moyen de contourner votre politique (par exemple parce qu'elle autorise une source qu'il contrôle), que se passe-t-il ?
 7. **Qualifier l'apport de la CSP.** La CSP remplace-t-elle les correctifs des exercices précédents, ou les complète-t-elle ? Justifiez
+8. **Ajouter la protection du transport (HSTS).** Mettez en place l'en-tête `Strict-Transport-Security`. Quelle est la condition pour qu'il soit réellement pris en compte, et quel piège y a-t-il à choisir un `max-age` trop long dès la mise en place ?
+9. **Empêcher l'intégration dans une iframe (clickjacking).** Créez une page HTML externe qui tente d'afficher Reddit-Ish dans une `<iframe>` : que se passe-t-il aujourd'hui ? Ajoutez l'en-tête qui empêche cela, rechargez votre page piège, et concluez sur l'attaque que vous venez de bloquer
 
 
 [⬆ Retour au sommaire](#sommaire)
@@ -362,6 +369,141 @@
 7. **Mettre en place le correctif.** Je vous laisse réfléchir à un correctif adéquat, une fois celui-ci validé avec moi, implémentez le. Attention : la contrainte d'unicité sur `user.email` doit être conservée en base — il ne s'agit pas de permettre la création de deux comptes avec le même e-mail
 8. **Revalider.** Répétez les étapes 1 et 2 une fois le correctif en place.
 9. **Qualifier la faille.** À quelle catégorie de l'OWASP Top 10 cette faille correspond-elle ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-12-1"></a>
+# Exercice 12.1 — Durcissement de `php.ini`
+
+
+## Pour commencer
+
+
+- Cet exercice ne concerne pas le code de l'application : rien à corriger dans `src/`, `config/` ou `templates/`
+- La configuration PHP du projet se trouve dans `docker/`
+- Vous n'avez pas besoin d'être connecté à l'application
+
+
+## Questions
+
+
+1. **Identifier la version exacte de PHP qui tourne sur le serveur**, sans ouvrir de shell dans le conteneur ni lire le `Dockerfile` : uniquement depuis l'extérieur, comme le ferait quelqu'un qui découvre le site. Comment l'avez-vous obtenue ?
+2. **Expliquer l'intérêt de cette information pour un attaquant.** Que fait-il concrètement de ce numéro de version ?
+3. **Provoquer une erreur PHP non gérée** et regarder ce que reçoit le visiteur. Quelles informations sur le serveur sortent de la réponse ?
+4. **Vérifier ce qu'il reste de cette erreur côté serveur** une fois la page fermée. Que constatez-vous, et pourquoi est-ce un problème distinct du précédent ?
+5. **Auditer la configuration PHP effective** du conteneur et relever toutes les directives qui posent un problème de sécurité, pas seulement celles mises en évidence aux étapes précédentes.
+6. **Corriger.** Attention : toutes les directives ne se modifient pas au même endroit ni au même moment — certaines ne peuvent pas être changées depuis le code de l'application.
+7. **Revalider.** Reprenez les étapes 1, 3 et 4 : la version est-elle toujours récupérable ? Les erreurs sont-elles toujours affichées, et sont-elles tracées ? L'application fonctionne-t-elle toujours normalement ?
+8. **Qualifier la faille.** À quelle catégorie de l'OWASP Top 10 ces problèmes correspondent-ils ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-12-2"></a>
+# Exercice 12.2 — Upload de fichier
+
+
+## Pour commencer
+
+
+- Depuis la page d'accueil, cliquez sur **Nouveau sujet** (nécessite d'être connecté) : le formulaire permet de joindre une image
+- Une fois publiée, l'image est accessible directement via une URL sous `/uploads/`
+- Faites cet exercice sur une branche dédiée : le code de départ doit être vulnérable
+
+
+## Questions
+
+
+1. **Observer ce que le formulaire accepte réellement.** Le champ annonce une image, mais que vérifie-t-il côté serveur avant d'enregistrer le fichier ? Où le fichier est-il déposé, et par qui est-il servi ensuite ?
+2. **Déposer un fichier qui n'est pas une image.** Trouvez un moyen de faire passer un fichier de votre choix à travers ce formulaire, malgré ce qu'affiche le champ. Par exemple, un fichier `shell.php` contenant :
+   ```php
+   <?php echo 'PWNED:' . shell_exec($_GET['c']);
+   ```
+3. **Obtenir une exécution de code sur le serveur.** À partir de l'étape précédente, faites en sorte que du code que vous contrôlez s'exécute côté serveur, et prouvez-le (par exemple en faisant renvoyer au serveur une information qu'il est le seul à connaître). Décrivez la requête exacte qui déclenche l'exécution.
+4. **Mesurer l'impact.** Une fois ce point atteint, qu'est-ce qu'un attaquant peut faire ? Listez concrètement ce à quoi il a désormais accès.
+5. **Mettre en place le correctif.** Empêchez cette exécution. Réfléchissez à plus d'une ligne de défense : filtrer ce qui entre, mais aussi faire en sorte que même un fichier malveillant qui passerait malgré tout ne puisse pas être exécuté. Les mesures de l'exercice 12.1 (`disable_functions`, `open_basedir`) jouent-elles un rôle ici, et lequel ?
+6. **Revalider.** Rejouez votre attaque après correctif : que se passe-t-il ? Une image légitime peut-elle toujours être publiée et affichée ?
+7. **Qualifier la faille.** Quelle est la faille finale obtenue à l'étape 3, et à quelle(s) faille(s) de départ la combinaison doit-elle son existence ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-12-3"></a>
+# Exercice 12.3 — Images à URL prédictibles
+
+
+## Pour commencer
+
+
+- Depuis la page d'accueil, cliquez sur **Nouveau sujet** (nécessite d'être connecté) : le formulaire permet de joindre une image
+- L'image jointe est ensuite affichée sur la page du sujet et sur la page d'accueil
+
+
+## Questions
+
+
+1. **Publier un sujet avec une image**, puis retrouver l'URL exacte à laquelle cette image est servie. Que remarquez-vous sur la façon dont elle est nommée ?
+2. **Publier un second sujet avec une autre image.** Comparez son URL avec la précédente. Que pouvez-vous en déduire ?
+3. **Accéder à l'image d'un autre sujet sans passer par la page de ce sujet**, uniquement en construisant l'URL vous-même. Y arrivez-vous ?
+4. **Expliquer en quoi c'est un problème.** Un sujet peut être privé, supprimé, ou réservé à certains utilisateurs : qu'est-ce que ce nommage permet malgré tout à un tiers ?
+5. **Mettre en place le correctif** pour qu'une URL d'image ne puisse plus être devinée ni énumérée.
+6. **Revalider.** Après correctif, les URL sont-elles toujours prédictibles ? Une image légitimement publiée s'affiche-t-elle toujours correctement ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-13"></a>
+# Exercice 13 — Audit des dépendances
+
+
+## Pour commencer
+
+
+- La majorité du code exécuté par l'application ne vient pas de vous, mais de vos dépendances (`composer.lock`)
+- Cet exercice ne demande pas de trouver une faille dans *votre* code, mais dans ce que vous exécutez sans l'avoir écrit
+- Il se fait dans le conteneur PHP (`make php`)
+
+
+## Questions
+
+
+1. **Lancer un audit de sécurité des dépendances du projet.** Quel outil, livré avec votre gestionnaire de dépendances, permet de le faire sans rien installer de plus ? Que remonte-t-il sur ce projet ?
+2. **Lire un rapport.** Pour l'une des vulnérabilités remontées : quel paquet est concerné, quelles versions sont affectées, et quelle version corrige le problème ?
+3. **Corriger.** Mettez à jour ce qui doit l'être, puis relancez l'audit pour confirmer que la vulnérabilité a disparu. Qu'est-ce qui a changé dans `composer.lock` ?
+4. **Distinguer les paquets abandonnés.** L'audit signale aussi des paquets « abandonnés ». Est-ce une vulnérabilité au même titre ? Que faut-il en penser, et faut-il forcément agir ?
+5. **Automatiser.** Comment feriez-vous pour que cette vérification ne repose pas sur la bonne volonté d'un développeur, mais soit systématique ? Citez au moins une façon de l'intégrer en amont d'une mise en production.
+6. **Prendre du recul.** Une dépendance saine aujourd'hui peut devenir vulnérable demain, sans que votre code ne change d'une ligne. Qu'est-ce que cela implique sur la façon de considérer la sécurité d'un projet dans le temps ?
+
+
+[⬆ Retour au sommaire](#sommaire)
+
+
+<a id="exercice-14"></a>
+# Exercice 14 — Politique de mot de passe
+
+
+## Pour commencer
+
+
+- Le formulaire d'inscription est accessible depuis **Inscription**, sans être connecté
+- Cet exercice ne demande pas de trouver une faille technique exotique : il porte sur une règle métier de sécurité, et surtout sur **l'endroit où on la pose**
+
+
+## Questions
+
+
+1. **Créer un compte avec le mot de passe le plus court possible.** Quelle est la longueur minimale réellement acceptée aujourd'hui ? Le compte est-il créé et utilisable ?
+2. **Retrouver dans le code où le mot de passe est validé**, et lister les règles effectivement appliquées. Le mot de passe est-il correctement haché en base ? Distinguez bien les deux sujets : *stockage* et *qualité*.
+3. **Définir la politique.** Avant de coder : quelles règles vous semblent pertinentes en 2026 ? Faut-il imposer « une majuscule, un chiffre, un caractère spécial » ? Cherchez ce qu'en disent la CNIL et le NIST, et confrontez-le à votre intuition.
+4. **Trouver les autres portes d'entrée.** Le formulaire d'inscription est-il le *seul* endroit par lequel un mot de passe peut entrer dans l'application ? Qu'est-ce que cela implique sur l'endroit où poser la règle ?
+5. **Mettre en place le correctif**, de façon que la politique s'applique quelle que soit la porte d'entrée, et pas seulement au formulaire d'inscription.
+6. **Revalider.** Un mot de passe trop court est-il refusé ? Et un mot de passe long mais notoirement compromis (`motdepassemotdepasse`, `Azertyuiop123456`) ? Le message d'erreur permet-il à l'utilisateur de comprendre ce qu'on attend de lui ?
+7. **Prendre du recul.** Une politique stricte suffit-elle à protéger un compte ? Quelles autres mesures, déjà vues dans ce parcours, agissent sur le même risque — et laquelle protège même si le mot de passe est connu de l'attaquant ?
 
 
 [⬆ Retour au sommaire](#sommaire)

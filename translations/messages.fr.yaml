@@ -16,11 +16,14 @@ common:
 home:
     title: Accueil - Reddit-Ish
     latest_topics: Derniers sujets
+    new_topic: Nouveau sujet
     no_topics: Aucun sujet pour le moment.
 
 topic:
     edit_title: 'Modifier %title%'
     edit_heading: Modifier le sujet
+    new_title: Nouveau sujet - Reddit-Ish
+    new_heading: Publier un nouveau sujet
     comments_heading: 'Commentaires (%count%)'
     no_comments: Soyez le premier à commenter.
     add_comment_heading: Ajouter un commentaire
@@ -33,6 +36,10 @@ comment:
 form:
     topic_title_label: Titre
     topic_content_label: Contenu
+    topic_category_label: Catégorie
+    topic_picture_label: Image
+    topic_picture_help: Laissez vide pour conserver l'image actuelle.
+    create_topic: Créer le sujet
     save_changes: Enregistrer les modifications
 
 category:
@@ -67,6 +74,7 @@ flash:
     login_required: Vous devez être connecté !
     comment_posted: Votre commentaire a été publié.
     topic_updated: Le sujet a été mis à jour.
+    topic_created: Votre sujet a été publié.
     account_created: Votre compte a été créé, afin de finaliser votre inscription, validez le mail que vous avez reçu !
     account_activated: Votre compte a été activé, vous pouvez maintenant vous connecter.
 

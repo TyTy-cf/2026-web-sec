@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Form\CommentType;
 use App\Form\TopicType;
 use App\Repository\TopicRepository;
+use App\Service\UploaderService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,17 +68,60 @@ final class TopicController extends AbstractController
         ]);
     }
 
+    #[Route('/sujet/nouveau', name: 'app_topic_new')]
+    public function new(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        UploaderService $uploader,
+    ): Response {
+        /** @var User $author */
+        $author = $this->getUser();
+
+        if (!$author) {
+            $this->addFlash('warning', 'flash.login_required');
+
+            return $this->redirectToRoute('app_login');
+        }
+
+        $topic = new Topic();
+
+        $form = $this->createForm(TopicType::class, $topic, ['isNew' => true]);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $topic->setAuthor($author)
+                ->setCreatedAt(new \DateTime())
+                ->setPicture($uploader->upload($form->get('picture')->getData(), 'topic'));
+
+            $entityManager->persist($topic);
+            $entityManager->flush();
+
+            $this->addFlash('success', 'flash.topic_created');
+
+            return $this->redirectToRoute('app_topic_show', ['id' => $topic->getId()]);
+        }
+
+        return $this->render('front/topic/new.html.twig', [
+            'topicForm' => $form,
+        ]);
+    }
+
     #[Route('/sujets/{id}/modifier', name: 'app_topic_edit')]
     public function edit(
         Topic $topic,
         Request $request,
         EntityManagerInterface $entityManager,
+        UploaderService $uploader,
     ): Response {
-        $form = $this->createForm(TopicType::class, $topic);
+        $form = $this->createForm(TopicType::class, $topic, ['isNew' => false]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $topic->setUpdatedAt(new \DateTime());
+
+            if (null !== $picture = $form->get('picture')->getData()) {
+                $topic->setPicture($uploader->upload($picture, 'topic'));
+            }
 
             $entityManager->flush();
 
